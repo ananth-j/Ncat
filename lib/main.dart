@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:fluent_ui/fluent_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -114,8 +114,8 @@ class _LogcatAppState extends State<LogcatApp> {
         _themeChoice == AppThemeChoice.vsDark
             ? kVsDarkPalette
             : kDarkModernPalette;
-    return FluentApp(
-      title: 'logcat',
+    return MaterialApp(
+      title: 'wcat',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(Brightness.light, kLightPalette),
       darkTheme: buildAppTheme(Brightness.dark, darkPalette),
@@ -369,22 +369,30 @@ class _LogcatPageState extends State<LogcatPage> {
 
   void _notify(
     String message, {
-    InfoBarSeverity severity = InfoBarSeverity.info,
+    bool isError = false,
   }) {
     if (!mounted) return;
-    displayInfoBar(
-      context,
-      alignment: Alignment.bottomRight,
-      duration: const Duration(seconds: 2),
-      builder:
-          (context, close) => InfoBar(
-            title: Text(message, style: const TextStyle(fontSize: 12)),
-            severity: severity,
-            action: IconButton(
-              icon: const Icon(FluentIcons.clear, size: 10),
-              onPressed: close,
-            ),
+    final palette = context.palette;
+    final sm = ScaffoldMessenger.maybeOf(context);
+    if (sm == null) return;
+    sm.hideCurrentSnackBar();
+    sm.showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: TextStyle(
+            fontSize: 12,
+            color: isError ? Colors.white : palette.text,
           ),
+        ),
+        backgroundColor: isError ? const Color(0xFFC5333D) : palette.panel,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+          side: BorderSide(color: isError ? Colors.transparent : palette.border),
+        ),
+      ),
     );
   }
 
@@ -426,7 +434,7 @@ class _LogcatPageState extends State<LogcatPage> {
 
     _notify(
       result,
-      severity: isError ? InfoBarSeverity.error : InfoBarSeverity.success,
+      isError: isError,
     );
   }
 
@@ -472,155 +480,205 @@ class _LogcatPageState extends State<LogcatPage> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
-            return ContentDialog(
-              title: Row(
-                children: [
-                  Icon(FluentIcons.bookmarks, size: 16, color: palette.accent),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Filter Presets',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ],
+            return Dialog(
+              backgroundColor: palette.panel,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: palette.border),
               ),
-              content: SizedBox(
-                width: 380,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Save current filter settings for quick access later.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextBox(
-                            controller: nameCtrl,
-                            placeholder: 'Preset name',
-                            style: const TextStyle(fontSize: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: SizedBox(
+                  width: 380,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.bookmark_outline, size: 18, color: palette.accent),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Filter Presets',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: palette.text,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          child: const Text('Save current'),
-                          onPressed: () async {
-                            final name = nameCtrl.text.trim();
-                            if (name.isEmpty) return;
-                            await _savePreset(name);
-                            nameCtrl.clear();
-                            setDialogState(() {});
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    if (_presets.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'No saved presets yet.',
-                          style: TextStyle(fontSize: 12, color: palette.dim),
-                        ),
-                      )
-                    else
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 240),
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          itemCount: _presets.length,
-                          separatorBuilder:
-                              (_, __) => Divider(
-                                style: DividerThemeData(
-                                  decoration: BoxDecoration(
-                                    color: palette.border,
+                          const Spacer(),
+                          IconButton(
+                            icon: Icon(Icons.close, size: 16, color: palette.dim),
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Save current filter settings for quick access later.',
+                        style: TextStyle(fontSize: 12, color: palette.dim),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 34,
+                              child: TextField(
+                                controller: nameCtrl,
+                                style: TextStyle(fontSize: 12, color: palette.text),
+                                decoration: InputDecoration(
+                                  hintText: 'Preset name',
+                                  hintStyle: TextStyle(fontSize: 12, color: palette.dim),
+                                  filled: true,
+                                  fillColor: palette.bg,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                    borderSide: BorderSide(color: palette.border),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                    borderSide: BorderSide(color: palette.border),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                    borderSide: BorderSide(color: palette.accent),
                                   ),
                                 ),
                               ),
-                          itemBuilder: (context, i) {
-                            final p = _presets[i];
-                            final details = [
-                              if (p.package.isNotEmpty) 'pkg: ${p.package}',
-                              'level: ${p.minLevel}+',
-                              if (p.search.isNotEmpty)
-                                '${p.useRegex ? 're' : 'search'}: ${p.search}',
-                            ].join('  ·  ');
-                            return HoverButton(
-                              onPressed: () {
-                                _applyPreset(p);
-                                Navigator.of(dialogContext).pop();
-                              },
-                              builder: (context, states) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 6,
-                                    horizontal: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        states.contains(WidgetState.hovered)
-                                            ? palette.selectedBg.withValues(
-                                              alpha: 0.5,
-                                            )
-                                            : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              p.name,
-                                              style: TextStyle(
-                                                fontSize: 12.5,
-                                                fontWeight: FontWeight.w600,
-                                                color: palette.text,
-                                              ),
-                                            ),
-                                            Text(
-                                              details,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: palette.dim,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: Icon(
-                                          FluentIcons.delete,
-                                          size: 13,
-                                          color: palette.dim,
-                                        ),
-                                        onPressed: () async {
-                                          await _deletePreset(p);
-                                          setDialogState(() {});
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: palette.accent,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                            ),
+                            onPressed: () async {
+                              final name = nameCtrl.text.trim();
+                              if (name.isEmpty) return;
+                              await _savePreset(name);
+                              nameCtrl.clear();
+                              setDialogState(() {});
+                            },
+                            child: const Text('Save current', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
                       ),
-                  ],
+                      const SizedBox(height: 14),
+                      if (_presets.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'No saved presets yet.',
+                            style: TextStyle(fontSize: 12, color: palette.dim),
+                          ),
+                        )
+                      else
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 240),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: _presets.length,
+                            separatorBuilder:
+                                (_, __) => Divider(
+                                  height: 1,
+                                  color: palette.border,
+                                ),
+                            itemBuilder: (context, i) {
+                              final p = _presets[i];
+                              final details = [
+                                if (p.package.isNotEmpty) 'pkg: ${p.package}',
+                                'level: ${p.minLevel}+',
+                                if (p.search.isNotEmpty)
+                                  '${p.useRegex ? 're' : 'search'}: ${p.search}',
+                              ].join('  ·  ');
+                              return Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  hoverColor: palette.selectedBg.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(4),
+                                  onTap: () {
+                                    _applyPreset(p);
+                                    Navigator.of(dialogContext).pop();
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 6,
+                                      horizontal: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                p.name,
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: palette.text,
+                                                ),
+                                              ),
+                                              Text(
+                                                details,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: palette.dim,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            size: 15,
+                                            color: palette.dim,
+                                          ),
+                                          onPressed: () async {
+                                            await _deletePreset(p);
+                                            setDialogState(() {});
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            style: TextButton.styleFrom(foregroundColor: palette.text),
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              actions: [
-                Button(
-                  child: const Text('Close'),
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                ),
-              ],
             );
           },
         );
@@ -646,85 +704,146 @@ class _LogcatPageState extends State<LogcatPage> {
                   _columns.showTag == config.showTag;
               if (active) {
                 return FilledButton(
-                  child: Text(label, style: const TextStyle(fontSize: 11)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
                   onPressed: () {},
+                  child: Text(label, style: const TextStyle(fontSize: 11)),
                 );
               }
-              return Button(
-                child: Text(label, style: const TextStyle(fontSize: 11)),
+              return OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: palette.text,
+                  side: BorderSide(color: palette.border),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                ),
                 onPressed: () {
                   _updateColumns(config);
                   setDialogState(() {});
                 },
+                child: Text(label, style: const TextStyle(fontSize: 11)),
               );
             }
 
-            return ContentDialog(
-              title: Row(
-                children: [
-                  Icon(
-                    FluentIcons.column_options,
-                    size: 18,
-                    color: palette.accent,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Configure Logcat Columns',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: 420,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Select fields to display in the log table. Unselected columns are removed, giving more space for messages.',
-                      style: TextStyle(color: palette.dim, fontSize: 12),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
+            Widget columnCheckbox({
+              required String title,
+              required String subtitle,
+              required bool value,
+              required ValueChanged<bool?> onChanged,
+            }) {
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => onChanged(!value),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                    child: Row(
                       children: [
-                        presetBtn('Standard (All)', LogColumnConfig.standard),
-                        presetBtn('Compact', LogColumnConfig.compact),
-                        presetBtn('Minimal', LogColumnConfig.minimal),
-                        presetBtn('Message Only', LogColumnConfig.messageOnly),
+                        Checkbox(
+                          value: value,
+                          activeColor: palette.accent,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          onChanged: onChanged,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: palette.text,
+                                ),
+                              ),
+                              Text(
+                                subtitle,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: palette.dim,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    Divider(
-                      style: DividerThemeData(
-                        decoration: BoxDecoration(color: palette.border),
+                  ),
+                ),
+              );
+            }
+
+            return Dialog(
+              backgroundColor: palette.panel,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: palette.border),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: SizedBox(
+                  width: 420,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.view_column_outlined,
+                            size: 18,
+                            color: palette.accent,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Configure Logcat Columns',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: palette.text,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: Icon(Icons.close, size: 16, color: palette.dim),
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Checkbox(
-                        checked: _columns.showTime,
-                        content: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Timestamp (TIME)',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Date and invocation time (e.g. 10-04 19:45:12.345)',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: palette.dim,
-                              ),
-                            ),
-                          ],
-                        ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Select fields to display in the log table. Unselected columns are removed, giving more space for messages.',
+                        style: TextStyle(color: palette.dim, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          presetBtn('Standard (All)', LogColumnConfig.standard),
+                          presetBtn('Compact', LogColumnConfig.compact),
+                          presetBtn('Minimal', LogColumnConfig.minimal),
+                          presetBtn('Message Only', LogColumnConfig.messageOnly),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Divider(height: 1, color: palette.border),
+                      const SizedBox(height: 8),
+                      columnCheckbox(
+                        title: 'Timestamp (TIME)',
+                        subtitle: 'Date and invocation time (e.g. 10-04 19:45:12.345)',
+                        value: _columns.showTime,
                         onChanged: (v) {
                           if (v != null) {
                             _updateColumns(_columns.copyWith(showTime: v));
@@ -732,30 +851,10 @@ class _LogcatPageState extends State<LogcatPage> {
                           }
                         },
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Checkbox(
-                        checked: _columns.showPidTid,
-                        content: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Process / Thread (PID-TID)',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Process and thread IDs (e.g. 1234-5678)',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: palette.dim,
-                              ),
-                            ),
-                          ],
-                        ),
+                      columnCheckbox(
+                        title: 'Process / Thread (PID-TID)',
+                        subtitle: 'Process and thread IDs (e.g. 1234-5678)',
+                        value: _columns.showPidTid,
                         onChanged: (v) {
                           if (v != null) {
                             _updateColumns(_columns.copyWith(showPidTid: v));
@@ -763,30 +862,10 @@ class _LogcatPageState extends State<LogcatPage> {
                           }
                         },
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Checkbox(
-                        checked: _columns.showPackage,
-                        content: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'App Package Name (PACKAGE)',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Application ID or process name (e.g. com.example.app)',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: palette.dim,
-                              ),
-                            ),
-                          ],
-                        ),
+                      columnCheckbox(
+                        title: 'App Package Name (PACKAGE)',
+                        subtitle: 'Application ID or process name (e.g. com.example.app)',
+                        value: _columns.showPackage,
                         onChanged: (v) {
                           if (v != null) {
                             _updateColumns(_columns.copyWith(showPackage: v));
@@ -794,30 +873,10 @@ class _LogcatPageState extends State<LogcatPage> {
                           }
                         },
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Checkbox(
-                        checked: _columns.showLevel,
-                        content: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Log Level (LVL)',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Severity badge (V, D, I, W, E, F)',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: palette.dim,
-                              ),
-                            ),
-                          ],
-                        ),
+                      columnCheckbox(
+                        title: 'Log Level (LVL)',
+                        subtitle: 'Severity badge (V, D, I, W, E, F)',
+                        value: _columns.showLevel,
                         onChanged: (v) {
                           if (v != null) {
                             _updateColumns(_columns.copyWith(showLevel: v));
@@ -825,30 +884,10 @@ class _LogcatPageState extends State<LogcatPage> {
                           }
                         },
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Checkbox(
-                        checked: _columns.showTag,
-                        content: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Tag (TAG)',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Component tag (e.g. ActivityManager)',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: palette.dim,
-                              ),
-                            ),
-                          ],
-                        ),
+                      columnCheckbox(
+                        title: 'Tag (TAG)',
+                        subtitle: 'Component tag (e.g. ActivityManager)',
+                        value: _columns.showTag,
                         onChanged: (v) {
                           if (v != null) {
                             _updateColumns(_columns.copyWith(showTag: v));
@@ -856,16 +895,25 @@ class _LogcatPageState extends State<LogcatPage> {
                           }
                         },
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: palette.accent,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            ),
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            child: const Text('Done'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              actions: [
-                FilledButton(
-                  child: const Text('Done'),
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                ),
-              ],
             );
           },
         );
@@ -873,45 +921,50 @@ class _LogcatPageState extends State<LogcatPage> {
     );
   }
 
-  List<MenuFlyoutItemBase> _buildColumnMenuItems() {
+  List<PopupMenuEntry<void>> _buildColumnMenuItems(AppPalette palette) {
     return [
-      ToggleMenuFlyoutItem(
-        text: const Text('Timestamp (TIME)'),
-        value: _columns.showTime,
-        onChanged: (v) => _updateColumns(_columns.copyWith(showTime: v)),
+      CheckedPopupMenuItem<void>(
+        checked: _columns.showTime,
+        value: null,
+        onTap: () => _updateColumns(_columns.copyWith(showTime: !_columns.showTime)),
+        child: Text('Timestamp (TIME)', style: TextStyle(fontSize: 12, color: palette.text)),
       ),
-      ToggleMenuFlyoutItem(
-        text: const Text('PID-TID'),
-        value: _columns.showPidTid,
-        onChanged: (v) => _updateColumns(_columns.copyWith(showPidTid: v)),
+      CheckedPopupMenuItem<void>(
+        checked: _columns.showPidTid,
+        value: null,
+        onTap: () => _updateColumns(_columns.copyWith(showPidTid: !_columns.showPidTid)),
+        child: Text('PID-TID', style: TextStyle(fontSize: 12, color: palette.text)),
       ),
-      ToggleMenuFlyoutItem(
-        text: const Text('Package Name'),
-        value: _columns.showPackage,
-        onChanged: (v) => _updateColumns(_columns.copyWith(showPackage: v)),
+      CheckedPopupMenuItem<void>(
+        checked: _columns.showPackage,
+        value: null,
+        onTap: () => _updateColumns(_columns.copyWith(showPackage: !_columns.showPackage)),
+        child: Text('Package Name', style: TextStyle(fontSize: 12, color: palette.text)),
       ),
-      ToggleMenuFlyoutItem(
-        text: const Text('Log Level (LVL)'),
-        value: _columns.showLevel,
-        onChanged: (v) => _updateColumns(_columns.copyWith(showLevel: v)),
+      CheckedPopupMenuItem<void>(
+        checked: _columns.showLevel,
+        value: null,
+        onTap: () => _updateColumns(_columns.copyWith(showLevel: !_columns.showLevel)),
+        child: Text('Log Level (LVL)', style: TextStyle(fontSize: 12, color: palette.text)),
       ),
-      ToggleMenuFlyoutItem(
-        text: const Text('Tag (TAG)'),
-        value: _columns.showTag,
-        onChanged: (v) => _updateColumns(_columns.copyWith(showTag: v)),
+      CheckedPopupMenuItem<void>(
+        checked: _columns.showTag,
+        value: null,
+        onTap: () => _updateColumns(_columns.copyWith(showTag: !_columns.showTag)),
+        child: Text('Tag (TAG)', style: TextStyle(fontSize: 12, color: palette.text)),
       ),
-      const MenuFlyoutSeparator(),
-      MenuFlyoutItem(
-        text: const Text('Reset: Standard View (All)'),
-        onPressed: () => _updateColumns(LogColumnConfig.standard),
+      const PopupMenuDivider(),
+      PopupMenuItem<void>(
+        onTap: () => _updateColumns(LogColumnConfig.standard),
+        child: Text('Reset: Standard View (All)', style: TextStyle(fontSize: 12, color: palette.text)),
       ),
-      MenuFlyoutItem(
-        text: const Text('Preset: Compact View'),
-        onPressed: () => _updateColumns(LogColumnConfig.compact),
+      PopupMenuItem<void>(
+        onTap: () => _updateColumns(LogColumnConfig.compact),
+        child: Text('Preset: Compact View', style: TextStyle(fontSize: 12, color: palette.text)),
       ),
-      MenuFlyoutItem(
-        text: const Text('Preset: Message Only'),
-        onPressed: () => _updateColumns(LogColumnConfig.messageOnly),
+      PopupMenuItem<void>(
+        onTap: () => _updateColumns(LogColumnConfig.messageOnly),
+        child: Text('Preset: Message Only', style: TextStyle(fontSize: 12, color: palette.text)),
       ),
     ];
   }
@@ -921,9 +974,9 @@ class _LogcatPageState extends State<LogcatPage> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return Container(
-      color: palette.bg,
-      child: Column(
+    return Scaffold(
+      backgroundColor: palette.bg,
+      body: Column(
         children: [
           // Top horizontal filter bar
           _TopFilterBar(
@@ -955,7 +1008,7 @@ class _LogcatPageState extends State<LogcatPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Left vertical action toolbar (Fluent rail style)
+                // Left vertical action toolbar
                 _LeftVerticalToolbar(
                   paused: _paused,
                   wrap: _wrap,
@@ -996,19 +1049,15 @@ class _LogcatPageState extends State<LogcatPage> {
                                 child: Tooltip(
                                   message: 'Scroll to end',
                                   child: FilledButton(
-                                    style: ButtonStyle(
-                                      padding: WidgetStateProperty.all(
-                                        const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 8,
-                                        ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: palette.accent,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
                                       ),
-                                      shape: WidgetStateProperty.all(
-                                        RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
                                       ),
                                     ),
                                     onPressed: () {
@@ -1018,7 +1067,7 @@ class _LogcatPageState extends State<LogcatPage> {
                                     child: const Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(FluentIcons.down, size: 14),
+                                        Icon(Icons.arrow_downward, size: 14),
                                         SizedBox(width: 4),
                                         Text(
                                           'Scroll to end',
@@ -1115,15 +1164,30 @@ class _LogcatPageState extends State<LogcatPage> {
               style: headerStyle.copyWith(color: palette.dim),
             ),
           ),
-          // Fluent DropDownButton for columns configuration
-          DropDownButton(
-            title: const Text('Columns', style: TextStyle(fontSize: 11)),
-            leading: Icon(
-              FluentIcons.column_options,
-              size: 13,
-              color: palette.dim,
+          // Columns menu button
+          PopupMenuButton<void>(
+            tooltip: 'Columns',
+            color: palette.panel,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+              side: BorderSide(color: palette.border),
             ),
-            items: _buildColumnMenuItems(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.view_column_outlined,
+                    size: 14,
+                    color: palette.dim,
+                  ),
+                  const SizedBox(width: 4),
+                  Text('Columns', style: TextStyle(fontSize: 11, color: palette.dim)),
+                ],
+              ),
+            ),
+            itemBuilder: (context) => _buildColumnMenuItems(palette),
           ),
         ],
       ),
@@ -1137,7 +1201,7 @@ class _LogcatPageState extends State<LogcatPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              FluentIcons.cell_phone,
+              Icons.phone_android,
               size: 36,
               color: context.palette.dim.withValues(alpha: 0.4),
             ),
@@ -1240,7 +1304,7 @@ class _LogcatPageState extends State<LogcatPage> {
             const SizedBox(width: 12),
             Container(width: 1, height: 12, color: palette.border),
             const SizedBox(width: 12),
-            Icon(FluentIcons.cell_phone, size: 13, color: palette.dim),
+            Icon(Icons.phone_android, size: 13, color: palette.dim),
             const SizedBox(width: 4),
             Text(
               _devices
@@ -1256,7 +1320,7 @@ class _LogcatPageState extends State<LogcatPage> {
             const SizedBox(width: 12),
             Container(width: 1, height: 12, color: palette.border),
             const SizedBox(width: 12),
-            Icon(FluentIcons.robot, size: 13, color: palette.dim),
+            Icon(Icons.android, size: 13, color: palette.dim),
             const SizedBox(width: 4),
             Text('PID: $_appPid', style: textStyle),
           ],
@@ -1320,17 +1384,17 @@ AppThemeChoice _nextThemeChoice(AppThemeChoice choice) => switch (choice) {
 };
 
 IconData _themeChoiceIcon(AppThemeChoice choice) => switch (choice) {
-  AppThemeChoice.system => FluentIcons.contrast,
-  AppThemeChoice.light => FluentIcons.sunny,
-  AppThemeChoice.darkModern => FluentIcons.clear_night,
-  AppThemeChoice.vsDark => FluentIcons.brightness,
+  AppThemeChoice.system => Icons.brightness_auto,
+  AppThemeChoice.light => Icons.light_mode,
+  AppThemeChoice.darkModern => Icons.dark_mode,
+  AppThemeChoice.vsDark => Icons.contrast,
 };
 
 String _themeChoiceLabel(AppThemeChoice choice) => switch (choice) {
   AppThemeChoice.system => 'Theme: Auto (System)',
-  AppThemeChoice.light => 'Theme: Fluent Light',
-  AppThemeChoice.darkModern => 'Theme: Fluent Dark Modern',
-  AppThemeChoice.vsDark => 'Theme: Fluent VS Dark',
+  AppThemeChoice.light => 'Theme: Modern Light',
+  AppThemeChoice.darkModern => 'Theme: Dark Modern',
+  AppThemeChoice.vsDark => 'Theme: VS Dark',
 };
 
 class _TopFilterBar extends StatelessWidget {
@@ -1374,7 +1438,7 @@ class _TopFilterBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Device selector ComboBox
+          // Device selector dropdown
           _devicePicker(palette),
           const SizedBox(width: 8),
 
@@ -1397,51 +1461,40 @@ class _TopFilterBar extends StatelessWidget {
     final value =
         devices.any((d) => d.serial == pickedDevice) ? pickedDevice : null;
 
-    return SizedBox(
+    return Container(
       width: 215,
-      child: ComboBox<String?>(
-        value: value,
-        placeholder: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(FluentIcons.cell_phone, size: 14, color: palette.dim),
-            const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 140),
-              child: Text(
-                devices.isEmpty ? 'No device' : 'Auto-select',
-                style: TextStyle(fontSize: 12, color: palette.dim),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
-          ],
-        ),
-        items: [
-          ComboBoxItem<String?>(
-            value: null,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color:
-                        devices.isNotEmpty
-                            ? palette.levelColor['I']
-                            : palette.dim,
-                  ),
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: palette.bg,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: palette.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: value,
+          isDense: true,
+          dropdownColor: palette.panel,
+          icon: Icon(Icons.arrow_drop_down, size: 16, color: palette.dim),
+          hint: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.phone_android, size: 14, color: palette.dim),
+              const SizedBox(width: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 140),
+                child: Text(
+                  devices.isEmpty ? 'No device' : 'Auto-select',
+                  style: TextStyle(fontSize: 12, color: palette.dim),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
-                const SizedBox(width: 6),
-                const Text('Auto-select', style: TextStyle(fontSize: 12)),
-              ],
-            ),
+              ),
+            ],
           ),
-          for (final d in devices)
-            ComboBoxItem<String?>(
-              value: d.serial,
+          items: [
+            DropdownMenuItem<String?>(
+              value: null,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1451,29 +1504,52 @@ class _TopFilterBar extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color:
-                          d.authorized
+                          devices.isNotEmpty
                               ? palette.levelColor['I']
-                              : palette.levelColor['W'],
+                              : palette.dim,
                     ),
                   ),
                   const SizedBox(width: 6),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 150),
-                    child: Text(
-                      d.label,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: d.authorized ? palette.text : palette.dim,
-                      ),
-                    ),
-                  ),
+                  Text('Auto-select', style: TextStyle(fontSize: 12, color: palette.text)),
                 ],
               ),
             ),
-        ],
-        onChanged: devices.isEmpty ? null : onDevice,
+            for (final d in devices)
+              DropdownMenuItem<String?>(
+                value: d.serial,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color:
+                            d.authorized
+                                ? palette.levelColor['I']
+                                : palette.levelColor['W'],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 150),
+                      child: Text(
+                        d.label,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: d.authorized ? palette.text : palette.dim,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+          onChanged: devices.isEmpty ? null : onDevice,
+        ),
       ),
     );
   }
@@ -1482,44 +1558,64 @@ class _TopFilterBar extends StatelessWidget {
     return SizedBox(
       height: 32,
       width: 185,
-      child: TextBox(
+      child: TextField(
         controller: pkgCtrl,
         onSubmitted: (_) => onPackage(),
-        placeholder: 'package:mine or pkg',
         style: TextStyle(fontSize: 12, color: palette.text),
-        prefix: Padding(
-          padding: const EdgeInsets.only(left: 8, right: 4),
-          child: Icon(FluentIcons.cell_phone, size: 13, color: palette.dim),
-        ),
-        suffix: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (pkgCtrl.text.isNotEmpty)
-              IconButton(
-                icon: Icon(FluentIcons.clear, size: 11, color: palette.dim),
-                onPressed: () {
-                  pkgCtrl.clear();
-                  onPackage();
-                },
-              )
-            else if (appPid != null)
-              Container(
-                margin: const EdgeInsets.only(right: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: palette.accentBg,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '$appPid',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: palette.accent,
+        decoration: InputDecoration(
+          hintText: 'package:mine or pkg',
+          hintStyle: TextStyle(fontSize: 12, color: palette.dim),
+          filled: true,
+          fillColor: palette.bg,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          prefixIcon: Icon(Icons.phone_android, size: 13, color: palette.dim),
+          prefixIconConstraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+          suffixIconConstraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (pkgCtrl.text.isNotEmpty)
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                  icon: Icon(Icons.close, size: 12, color: palette.dim),
+                  onPressed: () {
+                    pkgCtrl.clear();
+                    onPackage();
+                  },
+                )
+              else if (appPid != null)
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: palette.accentBg,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '$appPid',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: palette.accent,
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: BorderSide(color: palette.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: BorderSide(color: palette.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: BorderSide(color: palette.accent),
+          ),
         ),
       ),
     );
@@ -1529,52 +1625,79 @@ class _TopFilterBar extends StatelessWidget {
     return Expanded(
       child: SizedBox(
         height: 32,
-        child: TextBox(
+        child: TextField(
           controller: searchCtrl,
           onChanged: onSearch,
-          placeholder: 'Filter (tag, message, or text)...',
           style: TextStyle(fontSize: 12, color: palette.text),
-          prefix: Padding(
-            padding: const EdgeInsets.only(left: 8, right: 4),
-            child: Icon(FluentIcons.search, size: 13, color: palette.dim),
-          ),
-          suffix: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Tooltip(
-                message: 'Toggle Regex (.*)',
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: ToggleButton(
-                    checked: useRegex,
-                    onChanged: (_) => onRegex(),
-                    child: Text(
-                      '.*',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: useRegex ? palette.accent : palette.dim,
+          decoration: InputDecoration(
+            hintText: 'Filter (tag, message, or text)...',
+            hintStyle: TextStyle(fontSize: 12, color: palette.dim),
+            filled: true,
+            fillColor: palette.bg,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            prefixIcon: Icon(Icons.search, size: 14, color: palette.dim),
+            prefixIconConstraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+            suffixIconConstraints: const BoxConstraints(minWidth: 60, minHeight: 26),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Tooltip(
+                  message: 'Toggle Regex (.*)',
+                  child: InkWell(
+                    onTap: onRegex,
+                    borderRadius: BorderRadius.circular(3),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: useRegex ? palette.accentBg : Colors.transparent,
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(
+                          color: useRegex ? palette.accent : Colors.transparent,
+                        ),
+                      ),
+                      child: Text(
+                        '.*',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: useRegex ? palette.accent : palette.dim,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              if (searchCtrl.text.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                Tooltip(
-                  message: 'Clear search',
-                  child: IconButton(
-                    icon: Icon(FluentIcons.clear, size: 11, color: palette.dim),
-                    onPressed: () {
-                      searchCtrl.clear();
-                      onSearch('');
-                    },
+                if (searchCtrl.text.isNotEmpty) ...[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: 'Clear search',
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                      icon: Icon(Icons.close, size: 12, color: palette.dim),
+                      onPressed: () {
+                        searchCtrl.clear();
+                        onSearch('');
+                      },
+                    ),
                   ),
-                ),
+                ],
+                const SizedBox(width: 6),
               ],
-              const SizedBox(width: 4),
-            ],
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(color: palette.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(color: palette.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(color: palette.accent),
+            ),
           ),
         ),
       ),
@@ -1582,38 +1705,50 @@ class _TopFilterBar extends StatelessWidget {
   }
 
   Widget _levelDropdown(AppPalette palette) {
-    return SizedBox(
+    return Container(
       width: 125,
-      child: ComboBox<String>(
-        value: minLevel,
-        items:
-            _levels.map((l) {
-              final col = palette.levelColor[l] ?? palette.dim;
-              return ComboBoxItem<String>(
-                value: l,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: col,
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: palette.bg,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: palette.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: minLevel,
+          isDense: true,
+          dropdownColor: palette.panel,
+          icon: Icon(Icons.arrow_drop_down, size: 16, color: palette.dim),
+          items:
+              _levels.map((l) {
+                final col = palette.levelColor[l] ?? palette.dim;
+                return DropdownMenuItem<String>(
+                  value: l,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: col,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 7),
-                    Text(
-                      _levelNames[l] ?? l,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-        onChanged: (v) {
-          if (v != null) onLevel(v);
-        },
+                      const SizedBox(width: 7),
+                      Text(
+                        _levelNames[l] ?? l,
+                        style: TextStyle(fontSize: 12, color: palette.text),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+          onChanged: (v) {
+            if (v != null) onLevel(v);
+          },
+        ),
       ),
     );
   }
@@ -1668,7 +1803,7 @@ class _LeftVerticalToolbar extends StatelessWidget {
         children: [
           // Clear Logcat
           _toolButton(
-            icon: FluentIcons.clear,
+            icon: Icons.delete_sweep_outlined,
             tooltip: 'Clear Logcat (Ctrl+L)',
             onTap: onClear,
             palette: palette,
@@ -1677,7 +1812,7 @@ class _LeftVerticalToolbar extends StatelessWidget {
 
           // Pause / Resume
           _toolButton(
-            icon: paused ? FluentIcons.play : FluentIcons.pause,
+            icon: paused ? Icons.play_arrow : Icons.pause,
             tooltip: paused ? 'Resume Logcat' : 'Pause Logcat',
             onTap: onPause,
             active: paused,
@@ -1687,7 +1822,7 @@ class _LeftVerticalToolbar extends StatelessWidget {
 
           // Scroll to the end
           _toolButton(
-            icon: FluentIcons.down,
+            icon: Icons.arrow_downward,
             tooltip: 'Scroll to the end',
             onTap: onScrollToEnd,
             active: atBottom,
@@ -1697,7 +1832,7 @@ class _LeftVerticalToolbar extends StatelessWidget {
 
           // Scroll to the top
           _toolButton(
-            icon: FluentIcons.up,
+            icon: Icons.arrow_upward,
             tooltip: 'Scroll to the top',
             onTap: onScrollToTop,
             palette: palette,
@@ -1706,7 +1841,7 @@ class _LeftVerticalToolbar extends StatelessWidget {
 
           // Soft-wrap lines
           _toolButton(
-            icon: FluentIcons.align_left,
+            icon: Icons.wrap_text,
             tooltip: 'Soft-wrap lines',
             onTap: onWrap,
             active: wrap,
@@ -1716,7 +1851,7 @@ class _LeftVerticalToolbar extends StatelessWidget {
 
           // Configure visible columns / formatting
           _toolButton(
-            icon: FluentIcons.column_options,
+            icon: Icons.view_column_outlined,
             tooltip: 'Configure Columns / Log Format',
             onTap: onConfigureColumns,
             palette: palette,
@@ -1727,7 +1862,7 @@ class _LeftVerticalToolbar extends StatelessWidget {
 
           // Filter Presets
           _toolButton(
-            icon: FluentIcons.bookmarks,
+            icon: Icons.bookmark_outline,
             tooltip: 'Filter Presets',
             onTap: onPresets,
             palette: palette,
@@ -1736,7 +1871,7 @@ class _LeftVerticalToolbar extends StatelessWidget {
 
           // Export Logs
           _toolButton(
-            icon: FluentIcons.download,
+            icon: Icons.download,
             tooltip: 'Export Logs',
             onTap: onExport,
             palette: palette,
@@ -1745,7 +1880,7 @@ class _LeftVerticalToolbar extends StatelessWidget {
 
           // Restart ADB
           _toolButton(
-            icon: FluentIcons.refresh,
+            icon: Icons.refresh,
             tooltip: 'Restart ADB',
             onTap: onRestart,
             palette: palette,
@@ -1778,21 +1913,18 @@ class _LeftVerticalToolbar extends StatelessWidget {
         width: 32,
         height: 32,
         child: IconButton(
+          padding: EdgeInsets.zero,
           icon: Icon(
             icon,
-            size: 15,
+            size: 16,
             color: active ? palette.accent : palette.dim,
           ),
-          style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.all(
-              active ? palette.accentBg : Colors.transparent,
-            ),
-            shape: WidgetStateProperty.all(
-              RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-                side: BorderSide(
-                  color: active ? palette.accent : Colors.transparent,
-                ),
+          style: IconButton.styleFrom(
+            backgroundColor: active ? palette.accentBg : Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+              side: BorderSide(
+                color: active ? palette.accent : Colors.transparent,
               ),
             ),
           ),
@@ -1833,77 +1965,94 @@ class _LogRow extends StatefulWidget {
 
 class _LogRowState extends State<_LogRow> {
   bool _hovered = false;
-  final _flyoutController = FlyoutController();
-
-  @override
-  void dispose() {
-    _flyoutController.dispose();
-    super.dispose();
-  }
 
   void _showContextMenu(TapDownDetails details) {
-    _flyoutController.showFlyout<void>(
-      position: details.globalPosition,
-      builder: (context) {
-        return MenuFlyout(
-          items: [
-            MenuFlyoutItem(
-              leading: const Icon(FluentIcons.copy, size: 14),
-              text: const Text(
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+
+    final palette = context.palette;
+    final position = RelativeRect.fromRect(
+      Rect.fromLTWH(details.globalPosition.dx, details.globalPosition.dy, 0, 0),
+      Offset.zero & overlay.size,
+    );
+
+    showMenu<void>(
+      context: context,
+      position: position,
+      color: palette.panel,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: BorderSide(color: palette.border),
+      ),
+      items: [
+        PopupMenuItem<void>(
+          onTap: widget.onCopy,
+          child: Row(
+            children: [
+              Icon(Icons.copy, size: 14, color: palette.dim),
+              const SizedBox(width: 8),
+              Text(
                 'Copy full line',
-                style: TextStyle(fontSize: 12),
+                style: TextStyle(fontSize: 12, color: palette.text),
               ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                widget.onCopy();
-              },
-            ),
-            MenuFlyoutItem(
-              leading: const Icon(FluentIcons.align_left, size: 14),
-              text: const Text(
+            ],
+          ),
+        ),
+        PopupMenuItem<void>(
+          onTap: () => Clipboard.setData(ClipboardData(text: widget.entry.msg)),
+          child: Row(
+            children: [
+              Icon(Icons.wrap_text, size: 14, color: palette.dim),
+              const SizedBox(width: 8),
+              Text(
                 'Copy message only',
-                style: TextStyle(fontSize: 12),
+                style: TextStyle(fontSize: 12, color: palette.text),
               ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Clipboard.setData(ClipboardData(text: widget.entry.msg));
-              },
-            ),
-            MenuFlyoutItem(
-              leading: const Icon(FluentIcons.bookmarks, size: 14),
-              text: const Text('Copy tag', style: TextStyle(fontSize: 12)),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Clipboard.setData(ClipboardData(text: widget.entry.tag));
-              },
-            ),
-            const MenuFlyoutSeparator(),
-            MenuFlyoutItem(
-              leading: const Icon(FluentIcons.search, size: 14),
-              text: Text(
+            ],
+          ),
+        ),
+        PopupMenuItem<void>(
+          onTap: () => Clipboard.setData(ClipboardData(text: widget.entry.tag)),
+          child: Row(
+            children: [
+              Icon(Icons.bookmark_outline, size: 14, color: palette.dim),
+              const SizedBox(width: 8),
+              Text(
+                'Copy tag',
+                style: TextStyle(fontSize: 12, color: palette.text),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem<void>(
+          onTap: widget.onFilterTag,
+          child: Row(
+            children: [
+              Icon(Icons.search, size: 14, color: palette.dim),
+              const SizedBox(width: 8),
+              Text(
                 'Filter by tag: "${widget.entry.tag}"',
-                style: const TextStyle(fontSize: 12),
+                style: TextStyle(fontSize: 12, color: palette.text),
               ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                widget.onFilterTag();
-              },
-            ),
-            if (widget.entry.pkg != null && widget.entry.pkg!.isNotEmpty)
-              MenuFlyoutItem(
-                leading: const Icon(FluentIcons.cell_phone, size: 14),
-                text: Text(
+            ],
+          ),
+        ),
+        if (widget.entry.pkg != null && widget.entry.pkg!.isNotEmpty)
+          PopupMenuItem<void>(
+            onTap: () => widget.onFilterPackage(widget.entry.pkg!),
+            child: Row(
+              children: [
+                Icon(Icons.phone_android, size: 14, color: palette.dim),
+                const SizedBox(width: 8),
+                Text(
                   'Filter by package: "${widget.entry.pkg}"',
-                  style: const TextStyle(fontSize: 12),
+                  style: TextStyle(fontSize: 12, color: palette.text),
                 ),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  widget.onFilterPackage(widget.entry.pkg!);
-                },
-              ),
-          ],
-        );
-      },
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -1933,136 +2082,133 @@ class _LogRowState extends State<_LogRow> {
                 : 'app')
             : (widget.entry.pid == 0 ? 'system' : '-'));
 
-    return FlyoutTarget(
-      controller: _flyoutController,
-      child: GestureDetector(
-        onSecondaryTapDown: _showContextMenu,
-        child: MouseRegion(
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          child: Container(
-            color:
-                _hovered
-                    ? palette.selectedBg.withValues(alpha: 0.4)
-                    : Colors.transparent,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Time
-                if (widget.columns.showTime) ...[
-                  SizedBox(
-                    width: 110,
+    return GestureDetector(
+      onSecondaryTapDown: _showContextMenu,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Container(
+          color:
+              _hovered
+                  ? palette.selectedBg.withValues(alpha: 0.4)
+                  : Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Time
+              if (widget.columns.showTime) ...[
+                SizedBox(
+                  width: 110,
+                  child: Text(
+                    widget.entry.time,
+                    style: mono.copyWith(
+                      color: palette.dim.withValues(alpha: 0.85),
+                    ),
+                    maxLines: 1,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              // PID-TID
+              if (widget.columns.showPidTid) ...[
+                SizedBox(
+                  width: 82,
+                  child: Text(
+                    '${widget.entry.pid}-${widget.entry.tid}',
+                    style: mono.copyWith(
+                      color: palette.dim.withValues(alpha: 0.7),
+                    ),
+                    maxLines: 1,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              // App Package Name
+              if (widget.columns.showPackage) ...[
+                SizedBox(
+                  width: 140,
+                  child: Tooltip(
+                    message: appPkg,
                     child: Text(
-                      widget.entry.time,
+                      appPkg,
                       style: mono.copyWith(
                         color: palette.dim.withValues(alpha: 0.85),
-                      ),
-                      maxLines: 1,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                ],
-                // PID-TID
-                if (widget.columns.showPidTid) ...[
-                  SizedBox(
-                    width: 82,
-                    child: Text(
-                      '${widget.entry.pid}-${widget.entry.tid}',
-                      style: mono.copyWith(
-                        color: palette.dim.withValues(alpha: 0.7),
-                      ),
-                      maxLines: 1,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                ],
-                // App Package Name
-                if (widget.columns.showPackage) ...[
-                  SizedBox(
-                    width: 140,
-                    child: Tooltip(
-                      message: appPkg,
-                      child: Text(
-                        appPkg,
-                        style: mono.copyWith(
-                          color: palette.dim.withValues(alpha: 0.85),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                // Level Badge
-                if (widget.columns.showLevel) ...[
-                  Container(
-                    width: 26,
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(vertical: 0.5),
-                    decoration: BoxDecoration(
-                      color: levelColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: levelColor.withValues(alpha: 0.3),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Text(
-                      level,
-                      style: mono.copyWith(
-                        color: levelColor,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 10.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                // Tag
-                if (widget.columns.showTag) ...[
-                  SizedBox(
-                    width: 140,
-                    child: Text(
-                      widget.entry.tag,
-                      style: mono.copyWith(
-                        color: levelColor,
-                        fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                ],
-                // Message
-                Expanded(
-                  child: Text(
-                    widget.entry.msg,
-                    style: mono.copyWith(color: msgColor, fontSize: 13.5),
-                    softWrap: widget.wrap,
-                    maxLines: widget.wrap ? null : 1,
-                    overflow: widget.wrap ? null : TextOverflow.ellipsis,
-                  ),
                 ),
-                // Copy button on hover
-                Opacity(
-                  opacity: _hovered ? 1.0 : 0.0,
-                  child: Tooltip(
-                    message: 'Copy line',
-                    child: IconButton(
-                      icon: Icon(
-                        FluentIcons.copy,
-                        size: 12,
-                        color: palette.dim,
-                      ),
-                      onPressed: widget.onCopy,
+                const SizedBox(width: 8),
+              ],
+              // Level Badge
+              if (widget.columns.showLevel) ...[
+                Container(
+                  width: 26,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(vertical: 0.5),
+                  decoration: BoxDecoration(
+                    color: levelColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: levelColor.withValues(alpha: 0.3),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Text(
+                    level,
+                    style: mono.copyWith(
+                      color: levelColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10.5,
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
               ],
-            ),
+              // Tag
+              if (widget.columns.showTag) ...[
+                SizedBox(
+                  width: 140,
+                  child: Text(
+                    widget.entry.tag,
+                    style: mono.copyWith(
+                      color: levelColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              // Message
+              Expanded(
+                child: Text(
+                  widget.entry.msg,
+                  style: mono.copyWith(color: msgColor, fontSize: 13.5),
+                  softWrap: widget.wrap,
+                  maxLines: widget.wrap ? null : 1,
+                  overflow: widget.wrap ? null : TextOverflow.ellipsis,
+                ),
+              ),
+              // Copy button on hover
+              Opacity(
+                opacity: _hovered ? 1.0 : 0.0,
+                child: Tooltip(
+                  message: 'Copy line',
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.copy,
+                      size: 12,
+                      color: palette.dim,
+                    ),
+                    onPressed: widget.onCopy,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

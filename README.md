@@ -1,4 +1,4 @@
-# logoi
+# wcat 🐱
 
 A fast, filterable `adb logcat` viewer with a Flutter desktop/web UI and a
 lightweight Dart bridge server. No Android Studio required — just `adb`, a

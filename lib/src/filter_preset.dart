@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-const _kPresetsKey = 'logoi.filter_presets';
+const _kPresetsKey = 'wcat.filter_presets';
 
 class FilterPreset {
   const FilterPreset({

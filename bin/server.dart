@@ -5,7 +5,7 @@
 //   dart run bin/server.dart --port 8080 --web ../web/build/web
 
 import 'dart:io';
-import 'package:logoi/src/bridge_server_io.dart';
+import 'package:wcat/src/bridge_server_io.dart';
 
 Future<void> main(List<String> args) async {
   final port = int.tryParse(_argValue(args, '--port') ?? '') ?? 8080;

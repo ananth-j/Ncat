@@ -2,7 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'palette.dart';
 
-const _kThemeChoiceKey = 'logoi.theme_choice';
+const _kThemeChoiceKey = 'wcat.theme_choice';
 
 Future<AppThemeChoice> loadThemeChoice() async {
   final prefs = await SharedPreferences.getInstance();

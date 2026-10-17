@@ -1,9 +1,9 @@
-import 'package:fluent_ui/fluent_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:logoi/main.dart';
-import 'package:logoi/src/column_config.dart';
-import 'package:logoi/src/palette.dart';
+import 'package:wcat/main.dart';
+import 'package:wcat/src/column_config.dart';
+import 'package:wcat/src/palette.dart';
 
 void main() {
   test('LogEntry.fromJson parses a server payload', () {
@@ -91,7 +91,7 @@ void main() {
     expect(custom.showTag, isTrue);
   });
 
-  test('buildAppTheme builds FluentThemeData with AppPalette extension', () {
+  test('buildAppTheme builds ThemeData with AppPalette extension', () {
     final lightTheme = buildAppTheme(Brightness.light, kLightPalette);
     expect(lightTheme.brightness, Brightness.light);
     expect(lightTheme.extension<AppPalette>(), equals(kLightPalette));
@@ -101,23 +101,23 @@ void main() {
     expect(darkTheme.extension<AppPalette>(), equals(kDarkModernPalette));
   });
 
-  testWidgets('ComboBox renders device items without unbounded width error', (tester) async {
+  testWidgets('DropdownButton renders device items without unbounded width error', (tester) async {
     const devices = [
       DeviceInfo(serial: 'ROHQDY59QSG6EM6H', model: 'RMX3870'),
     ];
 
     await tester.pumpWidget(
-      FluentApp(
+      MaterialApp(
         theme: buildAppTheme(Brightness.dark, kDarkModernPalette),
-        home: ScaffoldPage(
-          content: Center(
+        home: Scaffold(
+          body: Center(
             child: SizedBox(
               width: 220,
-              child: ComboBox<String?>(
+              child: DropdownButton<String?>(
                 value: 'ROHQDY59QSG6EM6H',
                 items: [
                   for (final d in devices)
-                    ComboBoxItem<String?>(
+                    DropdownMenuItem<String?>(
                       value: d.serial,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -142,5 +142,3 @@ void main() {
     expect(find.text('RMX3870 (ROHQDY59QSG6EM6H)'), findsOneWidget);
   });
 }
-
-

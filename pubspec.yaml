@@ -1,5 +1,5 @@
-name: logoi
-description: "Logcat viewer: streams adb logcat over a WebSocket to a Flutter UI."
+name: wcat
+description: "Wcat: Fast, lightweight Android logcat & device companion over WebSocket with Flutter UI."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -12,7 +12,6 @@ dependencies:
   web_socket_channel: ^3.0.3
   web: ^1.1.0
   shared_preferences: ^2.5.3
-  fluent_ui: ^4.16.1
 
 dev_dependencies:
   flutter_test:

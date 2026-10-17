@@ -69,11 +69,11 @@ class LogColumnConfig {
   );
 }
 
-const _kColTimeKey = 'logoi.col_time';
-const _kColPidTidKey = 'logoi.col_pid_tid';
-const _kColLevelKey = 'logoi.col_level';
-const _kColTagKey = 'logoi.col_tag';
-const _kColPackageKey = 'logoi.col_package';
+const _kColTimeKey = 'wcat.col_time';
+const _kColPidTidKey = 'wcat.col_pid_tid';
+const _kColLevelKey = 'wcat.col_level';
+const _kColTagKey = 'wcat.col_tag';
+const _kColPackageKey = 'wcat.col_package';
 
 Future<LogColumnConfig> loadColumnConfig() async {
   try {

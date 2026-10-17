@@ -1,7 +1,7 @@
-import 'package:fluent_ui/fluent_ui.dart';
+import 'package:flutter/material.dart';
 
-/// Custom design tokens this app needs beyond standard Fluent theme tokens —
-/// resolved automatically by [FluentApp.theme]/[FluentApp.darkTheme] and read
+/// Custom design tokens this app needs beyond standard theme tokens —
+/// resolved automatically by [ThemeData.extensions] and read
 /// anywhere via `context.palette`.
 @immutable
 class AppPalette extends ThemeExtension<AppPalette> {
@@ -152,20 +152,24 @@ const kLightPalette = AppPalette(
   },
 );
 
-FluentThemeData buildAppTheme(Brightness brightness, AppPalette palette) {
-  return FluentThemeData(
+ThemeData buildAppTheme(Brightness brightness, AppPalette palette) {
+  return ThemeData(
     brightness: brightness,
+    useMaterial3: true,
     fontFamily: 'NotoSans',
-    accentColor: AccentColor.swatch({'normal': palette.accent}),
     scaffoldBackgroundColor: palette.bg,
     cardColor: palette.panel,
-    micaBackgroundColor: palette.bg,
-    acrylicBackgroundColor: palette.panel,
+    dividerColor: palette.border,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: palette.accent,
+      brightness: brightness,
+      surface: palette.panel,
+    ),
     extensions: [palette],
   );
 }
 
 extension AppPaletteX on BuildContext {
   AppPalette get palette =>
-      FluentTheme.of(this).extension<AppPalette>() ?? kDarkModernPalette;
+      Theme.of(this).extension<AppPalette>() ?? kDarkModernPalette;
 }
