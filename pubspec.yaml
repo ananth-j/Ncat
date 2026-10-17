@@ -1,0 +1,44 @@
+name: logoi
+description: "Logcat viewer: streams adb logcat over a WebSocket to a Flutter UI."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  web_socket_channel: ^3.0.3
+  web: ^1.1.0
+  shared_preferences: ^2.5.3
+  fluent_ui: ^4.16.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: NotoSans
+      fonts:
+        - asset: assets/fonts/noto_sans/NotoSans-Regular.ttf
+        - asset: assets/fonts/noto_sans/NotoSans-Italic.ttf
+          style: italic
+        - asset: assets/fonts/noto_sans/NotoSans-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/noto_sans/NotoSans-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/noto_sans/NotoSans-Light.ttf
+          weight: 300
+        - asset: assets/fonts/noto_sans/NotoSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/noto_sans/NotoSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/noto_sans/NotoSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/noto_sans/NotoSans-ExtraBold.ttf
+          weight: 800
