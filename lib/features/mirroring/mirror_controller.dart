@@ -172,10 +172,16 @@ class MirrorController {
     } catch (_) {}
   }
 
-  /// Launches external scrcpy window (Phase 4.1 quick win, 0% host CPU overhead).
-  Future<bool> launchScrcpy({String? serial}) async {
+  /// Status of the last scrcpy launch attempt ('launched', 'not_installed', 'error').
+  final ValueNotifier<String?> lastScrcpyStatus = ValueNotifier<String?>(null);
+
+  /// Launches external scrcpy window with detailed status return.
+  Future<String> launchScrcpyWithStatus({String? serial}) async {
     final targetSerial = serial ?? activeSerial;
-    if (targetSerial == null) return false;
+    if (targetSerial == null) {
+      lastScrcpyStatus.value = 'error';
+      return 'error';
+    }
 
     final uri = Uri(
       scheme: 'http',
@@ -186,14 +192,44 @@ class MirrorController {
     );
 
     final res = await _client.postJson(uri);
-    if (res != null && res['status'] == 'launched') {
+    final status = res?['status']?.toString() ?? 'error';
+    lastScrcpyStatus.value = status;
+
+    if (status == 'launched') {
       errorMessage.value = null;
-      return true;
     } else {
       errorMessage.value =
           res?['message']?.toString() ?? 'scrcpy not found in system PATH';
-      return false;
     }
+    return status;
+  }
+
+  /// Launches external scrcpy window (Phase 4.1 quick win, 0% host CPU overhead).
+  Future<bool> launchScrcpy({String? serial}) async {
+    final status = await launchScrcpyWithStatus(serial: serial);
+    return status == 'launched';
+  }
+
+  /// Checks whether scrcpy binary is installed on the host system.
+  Future<Map<String, dynamic>?> checkScrcpyStatus() async {
+    final uri = Uri(
+      scheme: 'http',
+      host: _bridgeHost,
+      port: _bridgePort,
+      path: '/api/scrcpy/status',
+    );
+    return await _client.getJson(uri);
+  }
+
+  /// Requests the bridge to download and install the official standalone scrcpy binary.
+  Future<Map<String, dynamic>?> installScrcpy() async {
+    final uri = Uri(
+      scheme: 'http',
+      host: _bridgeHost,
+      port: _bridgePort,
+      path: '/api/scrcpy/install',
+    );
+    return await _client.postJson(uri);
   }
 
   /// Sends a touch tap mapped from local widget coordinates to physical device coordinates.
@@ -326,5 +362,6 @@ class MirrorController {
     aspectRatio.dispose();
     currentFrame.dispose();
     errorMessage.dispose();
+    lastScrcpyStatus.dispose();
   }
 }

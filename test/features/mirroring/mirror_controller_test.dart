@@ -19,6 +19,15 @@ class MockMirrorCaptureClient implements CaptureClient {
     return mockPostJsonResult ?? {'status': 'ok'};
   }
 
+  Uri? lastGetJsonUri;
+  Map<String, dynamic>? mockGetJsonResult;
+
+  @override
+  Future<Map<String, dynamic>?> getJson(Uri uri) async {
+    lastGetJsonUri = uri;
+    return mockGetJsonResult;
+  }
+
   @override
   Future<Uint8List?> getScreenshot(Uri uri) async => null;
 
@@ -143,11 +152,49 @@ void main() {
 
       final ok = await controller.launchScrcpy();
       expect(ok, isTrue);
+      expect(controller.lastScrcpyStatus.value, 'launched');
       expect(mockClient.lastPostJsonUri?.path, '/api/scrcpy/launch');
       expect(
         mockClient.lastPostJsonUri?.queryParameters['serial'],
         'device-scrcpy-1',
       );
+    });
+
+    test(
+      'launchScrcpyWithStatus returns not_installed when binary missing',
+      () async {
+        controller.activeSerial = 'device-scrcpy-1';
+        mockClient.mockPostJsonResult = {
+          'status': 'not_installed',
+          'message': 'scrcpy not installed',
+        };
+
+        final status = await controller.launchScrcpyWithStatus();
+        expect(status, 'not_installed');
+        expect(controller.lastScrcpyStatus.value, 'not_installed');
+        expect(controller.errorMessage.value, 'scrcpy not installed');
+      },
+    );
+
+    test('checkScrcpyStatus queries /api/scrcpy/status', () async {
+      mockClient.mockGetJsonResult = {
+        'installed': true,
+        'path': '/usr/bin/scrcpy',
+        'version': 'v5.0.1',
+      };
+
+      final res = await controller.checkScrcpyStatus();
+      expect(res?['installed'], isTrue);
+      expect(res?['path'], '/usr/bin/scrcpy');
+      expect(mockClient.lastGetJsonUri?.path, '/api/scrcpy/status');
+    });
+
+    test('installScrcpy posts to /api/scrcpy/install', () async {
+      mockClient.mockPostJsonResult = {'status': 'ok', 'version': 'v5.0.1'};
+
+      final res = await controller.installScrcpy();
+      expect(res?['status'], 'ok');
+      expect(mockClient.lastPostJsonUri?.path, '/api/scrcpy/install');
     });
 
     test('onPause and onResume handles window lifecycle', () {

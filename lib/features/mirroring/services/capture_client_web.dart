@@ -38,6 +38,17 @@ class CaptureClient {
     return null;
   }
 
+  Future<Map<String, dynamic>?> getJson(Uri uri) async {
+    try {
+      final res = await web.window.fetch(uri.toString().toJS).toDart;
+      final text = (await res.text().toDart).toDart;
+      if (text.isNotEmpty) {
+        return jsonDecode(text) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<Map<String, dynamic>?> postJson(
     Uri uri, [
     Map<String, dynamic>? body,

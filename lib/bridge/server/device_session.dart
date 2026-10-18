@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'runners/process_runner.dart';
+import 'runners/scrcpy_resolver.dart';
 
 const int kHistorySize = 3000;
 
@@ -584,20 +585,31 @@ class DeviceSession {
     if (_isDisposed) {
       return {'status': 'error', 'message': 'Device session disposed'};
     }
+
+    final executable = ScrcpyResolver.findScrcpyExecutable();
+    if (executable == null) {
+      return {
+        'status': 'not_installed',
+        'message':
+            'scrcpy is not installed on this system. You can install it automatically in Wcat.',
+      };
+    }
+
     try {
-      final p = await processRunner.start('scrcpy', [
+      final p = await processRunner.start(executable, [
         '-s',
         serial,
         '--window-title',
         'wcat mirror - $serial',
       ]);
-      _system('Launched scrcpy window for $serial (PID ${p.pid})');
+      _system(
+        'Launched scrcpy window for $serial (PID ${p.pid}) using $executable',
+      );
       return {'status': 'launched', 'serial': serial, 'pid': p.pid};
     } catch (e) {
       return {
         'status': 'error',
-        'message':
-            'Failed to launch scrcpy: $e. Make sure scrcpy is installed in your PATH.',
+        'message': 'Failed to launch scrcpy ($executable): $e',
       };
     }
   }

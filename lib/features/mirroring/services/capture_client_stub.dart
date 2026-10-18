@@ -6,5 +6,6 @@ abstract class CaptureClient {
   Future<Uint8List?> getScreenshot(Uri uri);
   Future<bool> startRecord(Uri uri);
   Future<Uint8List?> stopRecord(Uri uri);
+  Future<Map<String, dynamic>?> getJson(Uri uri);
   Future<Map<String, dynamic>?> postJson(Uri uri, [Map<String, dynamic>? body]);
 }

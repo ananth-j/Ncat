@@ -7,6 +7,7 @@ import '../../protocol/messages.dart';
 import 'device_session.dart';
 import 'runners/adb_tracker.dart';
 import 'runners/process_runner.dart';
+import 'runners/scrcpy_resolver.dart';
 
 const Duration kFlushInterval = Duration(milliseconds: 100);
 const Duration kPidPollInterval = Duration(seconds: 2);
@@ -246,6 +247,10 @@ class LogcatBridgeServer {
           await _handleStreamMjpeg(req);
         } else if (req.uri.path == '/api/scrcpy/launch') {
           await _handleScrcpyLaunch(req);
+        } else if (req.uri.path == '/api/scrcpy/status') {
+          await _handleScrcpyStatus(req);
+        } else if (req.uri.path == '/api/scrcpy/install') {
+          await _handleScrcpyInstall(req);
         } else if (req.uri.path == '/api/input') {
           await _handleInput(req);
         } else if (req.uri.path == '/api/screenshot') {
@@ -819,6 +824,31 @@ class LogcatBridgeServer {
     final result = await session.launchScrcpy();
     req.response.headers.contentType = ContentType.json;
     if (result['status'] == 'error') {
+      req.response.statusCode = HttpStatus.internalServerError;
+    }
+    req.response.write(jsonEncode(result));
+    await req.response.close();
+  }
+
+  Future<void> _handleScrcpyStatus(HttpRequest req) async {
+    final path = ScrcpyResolver.findScrcpyExecutable();
+    req.response.headers.contentType = ContentType.json;
+    req.response.write(
+      jsonEncode({
+        'installed': path != null,
+        'path': path,
+        'version': ScrcpyResolver.version,
+      }),
+    );
+    await req.response.close();
+  }
+
+  Future<void> _handleScrcpyInstall(HttpRequest req) async {
+    final result = await ScrcpyResolver.installScrcpy(
+      onStatus: (msg) => _log('[scrcpy install] $msg'),
+    );
+    req.response.headers.contentType = ContentType.json;
+    if (result['status'] != 'ok') {
       req.response.statusCode = HttpStatus.internalServerError;
     }
     req.response.write(jsonEncode(result));

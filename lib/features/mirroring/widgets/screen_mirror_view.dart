@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../src/palette.dart';
 import '../mirror_controller.dart';
+import 'scrcpy_install_dialog.dart';
 
 /// Interactive screen mirror view with hardware scrcpy fallback,
 /// isolated RepaintBoundary rendering, and soft-keys navigation.
@@ -112,13 +113,21 @@ class _ScreenMirrorViewState extends State<ScreenMirrorView> {
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
               onPressed: () async {
-                final ok = await widget.controller.launchScrcpy();
-                if (!ok && mounted) {
+                final status = await widget.controller.launchScrcpyWithStatus();
+                if (!mounted) return;
+
+                if (status == 'not_installed') {
+                  await ScrcpyInstallDialog.show(
+                    context: context,
+                    controller: widget.controller,
+                    serial: widget.controller.activeSerial,
+                  );
+                } else if (status != 'launched') {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
                         widget.controller.errorMessage.value ??
-                            'scrcpy not found in system PATH',
+                            'Failed to launch scrcpy',
                       ),
                       duration: const Duration(seconds: 3),
                     ),

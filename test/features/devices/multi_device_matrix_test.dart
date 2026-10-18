@@ -35,6 +35,9 @@ class MockMatrixCaptureClient implements CaptureClient {
   ]) async {
     return {'status': 'ok'};
   }
+
+  @override
+  Future<Map<String, dynamic>?> getJson(Uri uri) async => null;
 }
 
 void main() {

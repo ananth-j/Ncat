@@ -57,6 +57,11 @@ class MockCaptureClient implements CaptureClient {
     lastPostJsonBody = body;
     return mockPostJsonResult;
   }
+
+  @override
+  Future<Map<String, dynamic>?> getJson(Uri uri) async {
+    return null;
+  }
 }
 
 void main() {

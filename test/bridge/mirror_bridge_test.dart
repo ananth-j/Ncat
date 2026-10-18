@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wcat/bridge/server/bridge_server.dart';
 import 'package:wcat/bridge/server/runners/process_runner.dart';
+import 'package:wcat/bridge/server/runners/scrcpy_resolver.dart';
 
 void main() {
   group('Bridge Mirroring & Input Endpoints (Phase 4)', () {
@@ -15,6 +16,8 @@ void main() {
     setUp(() async {
       fakeRunner = FakeProcessRunner();
       client = HttpClient();
+      ScrcpyResolver.executableOverride = 'scrcpy';
+      ScrcpyResolver.installerOverride = null;
 
       fakeRunner.onStart('track-devices', (args) async => FakeProcess());
       fakeRunner.onStart('logcat', (args) async => FakeProcess());
@@ -43,6 +46,8 @@ void main() {
     });
 
     tearDown(() async {
+      ScrcpyResolver.executableOverride = null;
+      ScrcpyResolver.installerOverride = null;
       client.close();
       await server.stop();
     });
@@ -68,6 +73,66 @@ void main() {
       expect(json['status'], 'launched');
       expect(json['serial'], 'device-mirror-1');
       expect(json['pid'], 777);
+    });
+
+    test(
+      'POST /api/scrcpy/launch returns not_installed when binary missing',
+      () async {
+        ScrcpyResolver.executableOverride = null;
+
+        final req = await client.postUrl(
+          Uri.parse(
+            'http://127.0.0.1:9889/api/scrcpy/launch?serial=device-mirror-1',
+          ),
+        );
+        final res = await req.close();
+
+        expect(res.statusCode, HttpStatus.ok);
+        final json =
+            jsonDecode(await res.transform(utf8.decoder).join())
+                as Map<String, dynamic>;
+        expect(json['status'], 'not_installed');
+      },
+    );
+
+    test('GET /api/scrcpy/status returns binary availability', () async {
+      ScrcpyResolver.executableOverride = '/custom/path/scrcpy';
+
+      final req = await client.getUrl(
+        Uri.parse('http://127.0.0.1:9889/api/scrcpy/status'),
+      );
+      final res = await req.close();
+
+      expect(res.statusCode, HttpStatus.ok);
+      final json =
+          jsonDecode(await res.transform(utf8.decoder).join())
+              as Map<String, dynamic>;
+      expect(json['installed'], isTrue);
+      expect(json['path'], '/custom/path/scrcpy');
+      expect(json['version'], isNotEmpty);
+    });
+
+    test('POST /api/scrcpy/install invokes installer handler', () async {
+      ScrcpyResolver.installerOverride = ({onStatus}) async {
+        onStatus?.call('Testing install hook');
+        return {
+          'status': 'ok',
+          'version': 'v5.0.1',
+          'path': '/tools/scrcpy.exe',
+        };
+      };
+
+      final req = await client.postUrl(
+        Uri.parse('http://127.0.0.1:9889/api/scrcpy/install'),
+      );
+      final res = await req.close();
+
+      expect(res.statusCode, HttpStatus.ok);
+      final json =
+          jsonDecode(await res.transform(utf8.decoder).join())
+              as Map<String, dynamic>;
+      expect(json['status'], 'ok');
+      expect(json['path'], '/tools/scrcpy.exe');
     });
 
     test(

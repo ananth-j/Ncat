@@ -45,6 +45,18 @@ class CaptureClient {
     return null;
   }
 
+  Future<Map<String, dynamic>?> getJson(Uri uri) async {
+    try {
+      final req = await _client.getUrl(uri);
+      final res = await req.close();
+      final text = await utf8.decoder.bind(res).join();
+      if (text.isNotEmpty) {
+        return jsonDecode(text) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<Map<String, dynamic>?> postJson(
     Uri uri, [
     Map<String, dynamic>? body,
