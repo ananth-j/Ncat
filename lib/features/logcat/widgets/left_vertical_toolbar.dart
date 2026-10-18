@@ -194,7 +194,7 @@ class LeftVerticalToolbar extends StatelessWidget {
           if (onToggleMirror != null) ...[
             _toolButton(
               icon: Icons.screen_share_outlined,
-              tooltip: 'Toggle Screen Mirror (Ctrl+Shift+M)',
+              tooltip: 'Screen Mirror (scrcpy 60fps) (Ctrl+Shift+M)',
               onTap: onToggleMirror!,
               active: isMirrorOpen,
               palette: palette,

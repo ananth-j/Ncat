@@ -12,7 +12,7 @@ import 'features/logcat/widgets/top_filter_bar.dart';
 import 'features/mirroring/capture_service.dart';
 import 'features/mirroring/mirror_controller.dart';
 import 'features/mirroring/widgets/multi_screen_grid.dart';
-import 'features/mirroring/widgets/screen_mirror_view.dart';
+import 'features/mirroring/widgets/scrcpy_install_dialog.dart';
 import 'features/mirroring/widgets/screenshot_dialog.dart';
 import 'src/palette.dart';
 import 'src/theme_pref.dart';
@@ -218,6 +218,35 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _handleLaunchMirror([String? targetSerial]) async {
+    final serial = targetSerial ?? _controller.activeDevice;
+    if (serial == null) {
+      _notify('No device selected', isError: true);
+      return;
+    }
+
+    _notify('Launching scrcpy mirror for $serial...');
+    final status = await _mirrorController.launchScrcpyWithStatus(
+      serial: serial,
+    );
+    if (!mounted) return;
+
+    if (status == 'not_installed') {
+      await ScrcpyInstallDialog.show(
+        context: context,
+        controller: _mirrorController,
+        serial: serial,
+      );
+    } else if (status == 'launched') {
+      _notify('scrcpy mirror active for $serial (60 FPS)');
+    } else {
+      _notify(
+        _mirrorController.errorMessage.value ?? 'Failed to launch scrcpy',
+        isError: true,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -237,10 +266,11 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
             ):
             _handleToggleRecord,
         const SingleActivator(
-          LogicalKeyboardKey.keyM,
-          control: true,
-          shift: true,
-        ): () => _mirrorController.toggleOpen(serial: _controller.activeDevice),
+              LogicalKeyboardKey.keyM,
+              control: true,
+              shift: true,
+            ):
+            _handleLaunchMirror,
         const SingleActivator(LogicalKeyboardKey.keyL, control: true):
             _controller.clearLogs,
       },
@@ -252,7 +282,6 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
             _captureService.isRecording,
             _captureService.recordingDuration,
             _captureService.isTakingScreenshot,
-            _mirrorController.isOpen,
           ]),
           builder: (context, _) {
             return Scaffold(
@@ -321,11 +350,8 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                                   onExport: _handleExport,
                                   onScreenshot: _handleScreenshot,
                                   onToggleRecord: _handleToggleRecord,
-                                  onToggleMirror:
-                                      () => _mirrorController.toggleOpen(
-                                        serial: _controller.activeDevice,
-                                      ),
-                                  isMirrorOpen: _mirrorController.isOpen.value,
+                                  onToggleMirror: _handleLaunchMirror,
+                                  isMirrorOpen: false,
                                   isRecording:
                                       _captureService.isRecording.value,
                                   recordingDuration:
@@ -351,7 +377,7 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                                   onThemeChoice: widget.onThemeChoice,
                                 ),
 
-                                // Log entries table view
+                                // Log entries table view (full width)
                                 Expanded(
                                   child: LogTableView(
                                     entries: _controller.visible,
@@ -375,18 +401,6 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                                     onUpdateColumns: _controller.updateColumns,
                                   ),
                                 ),
-
-                                // Screen Mirror split view (Phase 4)
-                                if (_mirrorController.isOpen.value)
-                                  SizedBox(
-                                    width: 340,
-                                    child: ScreenMirrorView(
-                                      controller: _mirrorController,
-                                      onClose:
-                                          () =>
-                                              _mirrorController.setOpen(false),
-                                    ),
-                                  ),
                               ],
                             ),
                   ),

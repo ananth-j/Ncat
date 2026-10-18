@@ -229,10 +229,10 @@ void main() {
           ),
         );
 
-        // Verify live cap badge is 2/2
-        expect(find.text('Live cap: 2/2'), findsOneWidget);
-        expect(find.text('● LIVE'), findsNWidgets(2));
-        expect(find.text('Go Live'), findsOneWidget);
+        // Verify badge and Mirror action
+        expect(find.text('scrcpy 60 FPS'), findsOneWidget);
+        expect(find.text('Mirror'), findsNWidgets(3));
+        expect(find.text('Mirror All (scrcpy)'), findsOneWidget);
 
         // Trigger "Screenshot All" bulk action (Phase 5.3)
         await tester.tap(find.text('Screenshot All'));

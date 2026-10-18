@@ -78,7 +78,7 @@ void main() {
     test(
       'POST /api/scrcpy/launch returns not_installed when binary missing',
       () async {
-        ScrcpyResolver.executableOverride = null;
+        ScrcpyResolver.executableOverride = '';
 
         final req = await client.postUrl(
           Uri.parse(

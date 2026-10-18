@@ -37,7 +37,9 @@ class ScrcpyResolver {
   /// Checks SCRCPY env var, Wcat local tools directory, system PATH,
   /// and common package manager locations (WinGet, Scoop, Homebrew, etc.).
   static String? findScrcpyExecutable() {
-    if (executableOverride != null) return executableOverride;
+    if (executableOverride != null) {
+      return executableOverride!.isEmpty ? null : executableOverride;
+    }
 
     // 1. Environment variable override
     final env = Platform.environment['SCRCPY'];

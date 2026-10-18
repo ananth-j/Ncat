@@ -6,11 +6,9 @@ import '../../../src/palette.dart';
 import '../../devices/models/device_info.dart';
 import '../capture_service.dart';
 import '../mirror_controller.dart';
-import 'screen_mirror_view.dart';
+import 'scrcpy_install_dialog.dart';
 
-const int kMaxConcurrentStreams = 2;
-
-/// Responsive multi-device matrix grid with a hard cap on concurrently live streams (Phase 5).
+/// Responsive multi-device matrix grid (Phase 5).
 class MultiScreenGrid extends StatefulWidget {
   const MultiScreenGrid({
     super.key,
@@ -34,7 +32,6 @@ class MultiScreenGrid extends StatefulWidget {
 class _MultiScreenGridState extends State<MultiScreenGrid> {
   final Map<String, MirrorController> _controllers = {};
   final Map<String, Uint8List?> _snapshots = {};
-  final Set<String> _liveSerials = {};
   bool _isBulkActionInProgress = false;
 
   @override
@@ -52,44 +49,9 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
   void _initDeviceControllers() {
     for (final dev in widget.devices) {
       if (!_controllers.containsKey(dev.serial)) {
-        final ctrl = MirrorController();
-        ctrl.fps.value = 5; // Eco framerate for grid tiles (Phase 5.2)
-        _controllers[dev.serial] = ctrl;
+        _controllers[dev.serial] = MirrorController();
       }
     }
-
-    // Default top devices to live up to hard cap (Phase 5.2)
-    if (_liveSerials.isEmpty && widget.devices.isNotEmpty) {
-      for (final dev in widget.devices.take(kMaxConcurrentStreams)) {
-        _startTileLive(dev.serial);
-      }
-    }
-  }
-
-  void _startTileLive(String serial) {
-    if (_liveSerials.contains(serial)) return;
-
-    // Enforce hard cap on live streams (Phase 5.2)
-    if (_liveSerials.length >= kMaxConcurrentStreams) {
-      final toRemove = _liveSerials.first;
-      _stopTileLive(toRemove);
-    }
-
-    _liveSerials.add(serial);
-    final ctrl = _controllers[serial];
-    if (ctrl != null) {
-      ctrl.setOpen(true, serial: serial);
-    }
-    setState(() {});
-  }
-
-  void _stopTileLive(String serial) {
-    _liveSerials.remove(serial);
-    final ctrl = _controllers[serial];
-    if (ctrl != null) {
-      ctrl.setOpen(false);
-    }
-    setState(() {});
   }
 
   Future<void> _refreshSnapshot(String serial) async {
@@ -134,10 +96,9 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
   }
 
   void _mirrorAll() {
-    // Starts live stream on devices respecting the stream cap (Phase 5.3)
-    _liveSerials.clear();
-    for (final dev in widget.devices.take(kMaxConcurrentStreams)) {
-      _startTileLive(dev.serial);
+    for (final dev in widget.devices) {
+      final ctrl = _controllers[dev.serial];
+      ctrl?.launchScrcpy(serial: dev.serial);
     }
   }
 
@@ -195,7 +156,7 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
                 border: Border.all(color: palette.accent),
               ),
               child: Text(
-                'Live cap: ${_liveSerials.length}/$kMaxConcurrentStreams',
+                'scrcpy 60 FPS',
                 style: TextStyle(
                   fontSize: 10,
                   color: palette.accent,
@@ -229,7 +190,7 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
             OutlinedButton.icon(
               icon: const Icon(Icons.screen_share_outlined, size: 14),
               label: const Text(
-                'Mirror All (Top 2)',
+                'Mirror All (scrcpy)',
                 style: TextStyle(fontSize: 11),
               ),
               style: OutlinedButton.styleFrom(
@@ -282,17 +243,15 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
       itemCount: widget.devices.length,
       itemBuilder: (context, i) {
         final dev = widget.devices[i];
-        final isLive = _liveSerials.contains(dev.serial);
         final ctrl = _controllers[dev.serial];
 
-        return _buildDeviceTile(dev, isLive, ctrl, palette);
+        return _buildDeviceTile(dev, ctrl, palette);
       },
     );
   }
 
   Widget _buildDeviceTile(
     DeviceInfo dev,
-    bool isLive,
     MirrorController? ctrl,
     AppPalette palette,
   ) {
@@ -357,42 +316,33 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
                   ),
                 ),
 
-                // Live stream toggle
-                if (isLive)
-                  Container(
+                // scrcpy standalone mirror launch
+                TextButton.icon(
+                  style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
+                      horizontal: 6,
                       vertical: 2,
                     ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF43A047).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF43A047)),
-                    ),
-                    child: const Text(
-                      '● LIVE',
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: Color(0xFF43A047),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  )
-                else
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      minimumSize: Size.zero,
-                    ),
-                    onPressed: () => _startTileLive(dev.serial),
-                    child: const Text(
-                      'Go Live',
-                      style: TextStyle(fontSize: 10),
-                    ),
+                    minimumSize: Size.zero,
                   ),
+                  icon: const Icon(Icons.open_in_new, size: 12),
+                  label: const Text('Mirror', style: TextStyle(fontSize: 10)),
+                  onPressed: () async {
+                    final ctrl = _controllers[dev.serial];
+                    if (ctrl == null) return;
+                    final status = await ctrl.launchScrcpyWithStatus(
+                      serial: dev.serial,
+                    );
+                    if (!mounted) return;
+                    if (status == 'not_installed') {
+                      await ScrcpyInstallDialog.show(
+                        context: context,
+                        controller: ctrl,
+                        serial: dev.serial,
+                      );
+                    }
+                  },
+                ),
 
                 IconButton(
                   icon: const Icon(Icons.list_alt, size: 14),
@@ -410,12 +360,7 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
           ),
 
           // Screen preview
-          Expanded(
-            child:
-                isLive && ctrl != null
-                    ? ScreenMirrorView(controller: ctrl)
-                    : _buildStaticSnapshotTile(dev.serial, palette),
-          ),
+          Expanded(child: _buildStaticSnapshotTile(dev.serial, palette)),
         ],
       ),
     );
