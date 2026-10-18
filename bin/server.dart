@@ -11,17 +11,23 @@ Future<void> main(List<String> args) async {
   final port = int.tryParse(_argValue(args, '--port') ?? '') ?? 8080;
   final webRoot = _argValue(args, '--web');
   final adb = Platform.environment['ADB'] ?? findAdbPath();
+  final token = _argValue(args, '--token');
+  final requireAuth = args.contains('--auth') || token != null;
 
   final server = LogcatBridgeServer(
     port: port,
     webRoot: webRoot,
     adbPath: adb,
+    authToken: token,
+    requireAuth: requireAuth,
     onLog: stdout.writeln,
   );
 
   final started = await server.start();
   if (!started) {
-    stderr.writeln('Error: Failed to bind to port $port (address already in use).');
+    stderr.writeln(
+      'Error: Failed to bind to port $port (address already in use).',
+    );
     exit(1);
   }
 
