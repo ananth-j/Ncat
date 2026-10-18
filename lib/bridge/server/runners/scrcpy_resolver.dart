@@ -185,23 +185,22 @@ class ScrcpyResolver {
 
     try {
       onStatus?.call('Downloading scrcpy ($version)...');
-      final client = HttpClient();
-      final uri = Uri.parse(downloadUrl);
-      final request = await client.getUrl(uri);
-      request.followRedirects = true;
-      final response = await request.close();
 
-      if (response.statusCode != HttpStatus.ok) {
-        client.close();
-        return {
-          'status': 'error',
-          'message': 'Failed to download scrcpy: HTTP ${response.statusCode}',
-        };
+      final candidateUrls = [downloadUrl, 'https://gh-proxy.com/$downloadUrl'];
+
+      bool downloaded = false;
+      for (final url in candidateUrls) {
+        downloaded = await _downloadFile(url, tempFile, onStatus: onStatus);
+        if (downloaded) break;
       }
 
-      final sink = tempFile.openWrite();
-      await response.pipe(sink);
-      client.close();
+      if (!downloaded) {
+        return {
+          'status': 'error',
+          'message':
+              'Failed to download scrcpy from official releases or mirrors. Please check your network connection.',
+        };
+      }
 
       onStatus?.call('Extracting scrcpy archive...');
       // Extract using native tar or powershell Expand-Archive
@@ -266,5 +265,71 @@ class ScrcpyResolver {
       } catch (_) {}
       return {'status': 'error', 'message': 'Installation failed: $e'};
     }
+  }
+
+  /// Downloads a file with multi-tier fallback: curl -> PowerShell (Windows) -> HttpClient.
+  static Future<bool> _downloadFile(
+    String url,
+    File destination, {
+    void Function(String msg)? onStatus,
+  }) async {
+    // 1. Primary: Native curl (standard on Windows 10/11, macOS, and Linux)
+    try {
+      final curlCmd = Platform.isWindows ? 'curl.exe' : 'curl';
+      final res = await Process.run(curlCmd, [
+        '-fSL',
+        '--retry',
+        '2',
+        '-o',
+        destination.path,
+        url,
+      ]);
+      if (res.exitCode == 0 &&
+          destination.existsSync() &&
+          destination.lengthSync() > 1024 * 1024) {
+        return true;
+      }
+    } catch (_) {}
+
+    // 2. Secondary (Windows): PowerShell Invoke-WebRequest
+    if (Platform.isWindows) {
+      try {
+        final psRes = await Process.run('powershell', [
+          '-NoProfile',
+          '-Command',
+          '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; '
+              'Invoke-WebRequest -Uri "$url" -OutFile "${destination.path}" -UseBasicParsing',
+        ]);
+        if (psRes.exitCode == 0 &&
+            destination.existsSync() &&
+            destination.lengthSync() > 1024 * 1024) {
+          return true;
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback: Dart HttpClient with environment proxy support
+    try {
+      final client = HttpClient();
+      client.findProxy = HttpClient.findProxyFromEnvironment;
+      client.connectionTimeout = const Duration(seconds: 20);
+      final uri = Uri.parse(url);
+      final req = await client.getUrl(uri);
+      req.followRedirects = true;
+      final res = await req.close();
+      if (res.statusCode == HttpStatus.ok) {
+        final sink = destination.openWrite();
+        await res.pipe(sink);
+        client.close();
+        if (destination.existsSync() &&
+            destination.lengthSync() > 1024 * 1024) {
+          return true;
+        }
+      } else {
+        client.close();
+      }
+    } catch (_) {}
+
+    return false;
   }
 }

@@ -6,11 +6,7 @@ import '../mirror_controller.dart';
 /// Modal dialog that explains scrcpy benefits and offers a one-click automated
 /// installer for the official standalone scrcpy binary release.
 class ScrcpyInstallDialog extends StatefulWidget {
-  const ScrcpyInstallDialog({
-    super.key,
-    required this.controller,
-    this.serial,
-  });
+  const ScrcpyInstallDialog({super.key, required this.controller, this.serial});
 
   final MirrorController controller;
   final String? serial;
@@ -87,8 +83,7 @@ class _ScrcpyInstallDialogState extends State<ScrcpyInstallDialog> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final errorColor =
-        palette.levelColor['E'] ??
-        Theme.of(context).colorScheme.error;
+        palette.levelColor['E'] ?? Theme.of(context).colorScheme.error;
 
     return Dialog(
       backgroundColor: palette.panel,
@@ -176,7 +171,8 @@ class _ScrcpyInstallDialogState extends State<ScrcpyInstallDialog> {
                     _FeatureRow(
                       icon: Icons.speed,
                       title: '60 FPS Ultra-Smooth Mirroring',
-                      subtitle: 'Direct hardware video decoding via H.264/H.265',
+                      subtitle:
+                          'Direct hardware video decoding via H.264/H.265',
                       palette: palette,
                     ),
                     const SizedBox(height: 10),
@@ -190,7 +186,8 @@ class _ScrcpyInstallDialogState extends State<ScrcpyInstallDialog> {
                     _FeatureRow(
                       icon: Icons.mouse,
                       title: 'Low-latency Touch & Keyboard',
-                      subtitle: 'Native mouse gestures and keystroke forwarding',
+                      subtitle:
+                          'Native mouse gestures and keystroke forwarding',
                       palette: palette,
                     ),
                   ],
@@ -290,7 +287,13 @@ class _ScrcpyInstallDialogState extends State<ScrcpyInstallDialog> {
                       _isInstalling ? Icons.hourglass_top : Icons.download,
                       size: 14,
                     ),
-                    label: Text(_isInstalling ? 'Installing...' : 'Install scrcpy'),
+                    label: Text(
+                      _isInstalling
+                          ? 'Installing...'
+                          : (_errorMessage != null
+                              ? 'Retry Installation'
+                              : 'Install scrcpy'),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
                       foregroundColor: Colors.white,
