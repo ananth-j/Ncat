@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:wcat/main.dart';
-import 'package:wcat/src/column_config.dart';
-import 'package:wcat/src/palette.dart';
 
 void main() {
   test('LogEntry.fromJson parses a server payload', () {
