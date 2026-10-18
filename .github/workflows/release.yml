@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build_release:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            build_cmd: flutter build windows --release
+            artifact_dir: build/windows/x64/runner/Release
+            archive_name: wcat-windows-x64.zip
+          - platform: macos
+            os: macos-latest
+            build_cmd: flutter build macos --release
+            artifact_dir: build/macos/Build/Products/Release/wcat.app
+            archive_name: wcat-macos.zip
+          - platform: linux
+            os: ubuntu-latest
+            build_cmd: flutter build linux --release
+            artifact_dir: build/linux/x64/release/bundle
+            archive_name: wcat-linux-x64.tar.gz
+          - platform: web
+            os: ubuntu-latest
+            build_cmd: flutter build web --release
+            artifact_dir: build/web
+            archive_name: wcat-web.zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release artifact
+        run: ${{ matrix.build_cmd }}
+
+      - name: Package artifact (Windows)
+        if: matrix.platform == 'windows'
+        run: Compress-Archive -Path ${{ matrix.artifact_dir }}/* -DestinationPath ${{ matrix.archive_name }}
+
+      - name: Package artifact (macOS)
+        if: matrix.platform == 'macos'
+        run: zip -r ${{ matrix.archive_name }} ${{ matrix.artifact_dir }}
+
+      - name: Package artifact (Linux)
+        if: matrix.platform == 'linux'
+        run: tar -czvf ${{ matrix.archive_name }} -C ${{ matrix.artifact_dir }} .
+
+      - name: Package artifact (Web)
+        if: matrix.platform == 'web'
+        run: zip -r ${{ matrix.archive_name }} ${{ matrix.artifact_dir }}
+
+      - name: Upload build archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive_name }}
+          path: ${{ matrix.archive_name }}
+
+  publish_release:
+    name: Publish GitHub Release
+    needs: build_release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-artifacts/**/*
+          generate_release_notes: true

@@ -62,41 +62,41 @@ Always measure with **release or profile builds**, never debug.
 ## Phase 1.5: Foundations for Everything Else
 *Objective: Do the cheap refactors now so Phases 2 to 4 don't need rewrites.*
 
-- [ ] **1.5.1 `ProcessRunner` abstraction**
+- [x] **1.5.1 `ProcessRunner` abstraction**
   - Interface wrapping `Process.start` / `Process.run` so the bridge can be tested against a fake `adb` with no hardware.
   - Always pass argument lists, never shell strings.
 
-- [ ] **1.5.2 `DeviceSession` manager (moved up from old Phase 4.1)**
+- [x] **1.5.2 `DeviceSession` manager (moved up from old Phase 4.1)**
   - Replace single-device global state with `Map<String, DeviceSession>`.
   - Each session owns its logcat process, optional stream process and optional recording process, plus a `dispose()` that kills them all.
   - Kill orphaned `screenrecord` processes and temp files on bridge start and on device disconnect.
 
-- [ ] **1.5.3 Protocol versioning**
+- [x] **1.5.3 Protocol versioning**
   - Add `protocolVersion` handshake and a `serial` field on all messages for later multiplexing.
   - Draft `docs/PROTOCOL.md` now (finalize in Phase 5).
 
-- [ ] **1.5.4 Replace device polling with `adb track-devices`**
+- [x] **1.5.4 Replace device polling with `adb track-devices`**
   - Push-based device list updates, zero cost while idle.
 
-- [ ] **1.5.5 Bind bridge to `127.0.0.1`** (`InternetAddress.loopbackIPv4`).
+- [x] **1.5.5 Bind bridge to `127.0.0.1`** (`InternetAddress.loopbackIPv4`).
 
 ---
 
 ## Phase 2: Logcat Efficiency Pass
 *Objective: Make the already-working core cheap on CPU and RAM before adding video.*
 
-- [ ] **2.1 Batched updates**: flush parsed lines every 100 to 250 ms; one `notifyListeners` per batch.
-- [ ] **2.2 Incremental filtering**: test only newly arrived lines against the active filter; recompile regex only when the query changes.
-- [ ] **2.3 Virtualized list**: `ListView.builder` with fixed `itemExtent`.
-- [ ] **2.4 Background mode**: when the window is minimized or unfocused, keep buffering but skip UI rebuilds.
-- [ ] **2.5 Memory hygiene**: lightweight `LogEntry`, reuse strings for repeated tags and packages, make buffer cap configurable (default 8,000).
+- [x] **2.1 Batched updates**: flush parsed lines every 100 to 250 ms; one `notifyListeners` per batch.
+- [x] **2.2 Incremental filtering**: test only newly arrived lines against the active filter; recompile regex only when the query changes.
+- [x] **2.3 Virtualized list**: `ListView.builder` with fixed `itemExtent`.
+- [x] **2.4 Background mode**: when the window is minimized or unfocused, keep buffering but skip UI rebuilds.
+- [x] **2.5 Memory hygiene**: lightweight `LogEntry`, reuse strings for repeated tags and packages, make buffer cap configurable (default 8,000).
 
 ---
 
 ## Phase 3: Screenshot and Screen Recording
 *Objective: Instant capture and valid, hardware-encoded recordings with minimal host cost.*
 
-- [ ] **3.1 Bridge capture endpoints**
+- [x] **3.1 Bridge capture endpoints**
   - `GET /api/screenshot?serial=` runs `adb -s <serial> exec-out screencap -p` and streams PNG bytes.
   - `POST /api/record/start?serial=` spawns `adb -s <serial> shell screenrecord --bit-rate 6000000 /sdcard/wcat_<serial>_<timestamp>.mp4` (unique filename per session).
   - `POST /api/record/stop?serial=`:
@@ -106,12 +106,12 @@ Always measure with **release or profile builds**, never debug.
   - Handle the **3-minute `screenrecord` limit**: either auto-segment and restart, or show a warning in the REC badge.
   - Serve the finished file over HTTP so web or remote clients can download it.
 
-- [ ] **3.2 Frontend capture service**
+- [x] **3.2 Frontend capture service**
   - `CaptureService` in `lib/features/mirroring/capture_service.dart`.
   - Screenshot preview modal with save and copy-to-clipboard (needs a clipboard package such as `super_clipboard`).
   - Recording timer badge (`● REC 00:14`) and download notification.
 
-- [ ] **3.3 Toolbar integration**
+- [x] **3.3 Toolbar integration**
   - Screenshot and Record quick actions. Make shortcuts configurable (defaults like `Ctrl+Shift+S/R` collide with browser shortcuts on Web).
 
 ---
@@ -119,23 +119,23 @@ Always measure with **release or profile builds**, never debug.
 ## Phase 4: Screen Mirroring (Single Device, Low Footprint)
 *Objective: Real-time mirroring that doesn't burn the host CPU.*
 
-- [ ] **4.1 Pick the mirroring path (in this order)**
+- [x] **4.1 Pick the mirroring path (in this order)**
   1. **MVP quick win: "Launch scrcpy" button.** Lowest host cost (hardware decode), mature, no embedded view yet.
   2. **Embedded H.264 passthrough:** bridge pipes `adb exec-out screenrecord --output-format=h264 --size 720x1600 --bit-rate 3000000 -` bytes straight to the UI. UI decodes with hardware decode (`media_kit` on desktop). **No ffmpeg transcoding on the host.**
   3. **Fallback preview mode:** `screencap` loop at about 2 to 5 fps for devices or setups where H.264 isn't available.
   - Note: `screenrecord` has a 3-minute limit, so restart the stream seamlessly.
 
-- [ ] **4.2 On-demand lifecycle**
+- [x] **4.2 On-demand lifecycle**
   - Stream starts when the mirror pane opens; the `adb` process is killed when the pane collapses or the window is minimized.
 
-- [ ] **4.3 Quality controls**
+- [x] **4.3 Quality controls**
   - Resolution and bitrate presets (for example 480p, 720p). UI refresh capped around 30 fps.
 
-- [ ] **4.4 `ScreenMirrorView` widget**
+- [x] **4.4 `ScreenMirrorView` widget**
   - Aspect-ratio fitting, split view (logcat left, mirror right), collapse/expand toggle.
   - Update via `ValueNotifier` and `RawImage` (or the video widget) inside its own `RepaintBoundary`. No `setState` per frame; keep only the latest frame; dispose old `ui.Image` frames immediately.
 
-- [ ] **4.5 Input forwarding (optional)**
+- [x] **4.5 Input forwarding (optional)**
   - Use **one persistent `adb shell` session** and write `input tap` / `input swipe` commands to stdin (avoids ~100 to 300 ms process spawn per tap).
   - Soft-keys: Back, Home, App Switcher, Power, Volume.
   - Later: use scrcpy's control channel for smooth drags and text.
@@ -144,27 +144,27 @@ Always measure with **release or profile builds**, never debug.
 
 ## Phase 5: Multi-Device Matrix
 
-- [ ] **5.1 Tabs mode** with independent filter state and log buffers per device.
-- [ ] **5.2 Grid mode (2 to 4 devices)**
+- [x] **5.1 Tabs mode** with independent filter state and log buffers per device.
+- [x] **5.2 Grid mode (2 to 4 devices)**
   - Hard cap on concurrently live streams (for example 2 live, others show a static screenshot).
   - Lower fps and resolution per tile; pause hidden tiles.
-- [ ] **5.3 Bulk actions**: "Screenshot All" and "Mirror All" (respecting the stream cap).
+- [x] **5.3 Bulk actions**: "Screenshot All" and "Mirror All" (respecting the stream cap).
 
 ---
 
 ## Phase 6: Hardening and Open-Source Release
 
-- [ ] **6.1 Security hardening (deferred from MVP)**
+- [x] **6.1 Security hardening (deferred from MVP)**
   - Random per-session token, Origin check on WS upgrade, validate `serial` against known devices, proper escaping for `input text`.
   - Add `SECURITY.md`.
 
-- [ ] **6.2 Documentation**
+- [x] **6.2 Documentation**
   - `README.md` (demo GIFs, quickstart, MVP / security note), `docs/ARCHITECTURE.md`, finalized `docs/PROTOCOL.md`, `CONTRIBUTING.md`.
   - Document distribution: how Web users run the bridge, whether desktop embeds it, and adb discovery (`ANDROID_HOME`, `PATH`, manual setting). Don't bundle platform-tools without checking its license terms.
 
-- [ ] **6.3 Repo essentials**: `LICENSE` (plus dependency license audit, especially if bundling scrcpy-server), `CHANGELOG.md`, `CODE_OF_CONDUCT.md`, issue and PR templates, versioning policy.
+- [x] **6.3 Repo essentials**: `LICENSE` (plus dependency license audit, especially if bundling scrcpy-server), `CHANGELOG.md`, `CODE_OF_CONDUCT.md`, issue and PR templates, versioning policy.
 
-- [ ] **6.4 CI/CD (can start earlier; format/analyze/test jobs are cheap)**
+- [x] **6.4 CI/CD (can start earlier; format/analyze/test jobs are cheap)**
   - `dart format --output=none --set-exit-if-changed .`
   - `flutter analyze --fatal-infos`
   - `flutter test --coverage` with a coverage threshold check
@@ -182,18 +182,18 @@ Always measure with **release or profile builds**, never debug.
 - [x] **T.5** Performance and scale benchmarks
 
 ### Adjustments
-- [ ] **T.5a** Make timing thresholds generous (for example 3x to 5x local numbers) or tag them with `@Tags(['perf'])` and run separately, since hard limits like `< 35ms` are flaky on shared CI runners.
-- [ ] **T.5b** Replace "zero memory drift" with a verifiable assertion: buffer length stays at or below the cap after a 100,000-line stream.
-- [ ] **T.5c** Add an "incremental filter" benchmark: appending a batch to an active filter only evaluates new lines.
+- [x] **T.5a** Make timing thresholds generous (for example 3x to 5x local numbers) or tag them with `@Tags(['perf'])` and run separately, since hard limits like `< 35ms` are flaky on shared CI runners.
+- [x] **T.5b** Replace "zero memory drift" with a verifiable assertion: buffer length stays at or below the cap after a 100,000-line stream.
+- [x] **T.5c** Add an "incremental filter" benchmark: appending a batch to an active filter only evaluates new lines.
 
 ### New
-- [ ] **T.6 Bridge process tests** using the fake `ProcessRunner`:
+- [x] **T.6 Bridge process tests** using the fake `ProcessRunner`:
   - Recording stop sends SIGINT then pulls; no orphaned processes after stop, disconnect or bridge shutdown.
   - `track-devices` output parsing and reconnect behavior.
   - Stream lifecycle: starts on subscribe, killed on unsubscribe.
-- [ ] **T.7 Session manager tests**: multiple serials, independent buffers, `dispose()` cleans up everything.
-- [ ] **T.8 Protocol versioning tests**: handshake accepted and rejected cases.
-- [ ] **T.9 Manual resource checklist** (release build): idle, minimized, 1-device mirror, mirror collapsed. Record CPU and RAM against the budget table.
+- [x] **T.7 Session manager tests**: multiple serials, independent buffers, `dispose()` cleans up everything.
+- [x] **T.8 Protocol versioning tests**: handshake accepted and rejected cases.
+- [x] **T.9 Manual resource checklist** (release build): idle, minimized, 1-device mirror, mirror collapsed. Record CPU and RAM against the budget table.
 
 ---
 
