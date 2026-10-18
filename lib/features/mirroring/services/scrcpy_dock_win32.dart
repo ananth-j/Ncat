@@ -14,17 +14,24 @@ ScrcpyDockService createDockService() {
   return ScrcpyDockStub();
 }
 
-// Win32 Constants
+// Win32 Structs & Constants
+final class _POINT extends Struct {
+  @Int32()
+  external int x;
+  @Int32()
+  external int y;
+}
+
+const int _gwlpHwndParent = -8;
 const int _gwlStyle = -16;
+
 const int _wsPopup = 0x80000000;
 const int _wsCaption = 0x00C00000;
 const int _wsThickFrame = 0x00040000;
 const int _wsMinimizeBox = 0x00020000;
 const int _wsMaximizeBox = 0x00010000;
 const int _wsSysMenu = 0x00080000;
-const int _wsChild = 0x40000000;
 const int _wsVisible = 0x10000000;
-const int _wsClipSiblings = 0x04000000;
 
 const int _hwndTop = 0;
 const int _swpNoActivate = 0x0010;
@@ -34,28 +41,6 @@ const int _swpShowWindow = 0x0040;
 const int _wmClose = 0x0010;
 
 // Win32 FFI Signatures
-typedef _GetCurrentProcessIdC = Uint32 Function();
-typedef _GetCurrentProcessIdDart = int Function();
-
-typedef _EnumWindowsProc = Int32 Function(IntPtr hwnd, IntPtr lParam);
-typedef _EnumWindowsC = Int32 Function(
-  Pointer<NativeFunction<_EnumWindowsProc>> lpEnumFunc,
-  IntPtr lParam,
-);
-typedef _EnumWindowsDart = int Function(
-  Pointer<NativeFunction<_EnumWindowsProc>> lpEnumFunc,
-  int lParam,
-);
-
-typedef _GetWindowThreadProcessIdC = Uint32 Function(
-  IntPtr hwnd,
-  Pointer<Uint32> lpdwProcessId,
-);
-typedef _GetWindowThreadProcessIdDart = int Function(
-  int hwnd,
-  Pointer<Uint32> lpdwProcessId,
-);
-
 typedef _FindWindowWC = IntPtr Function(
   Pointer<Utf16> lpClassName,
   Pointer<Utf16> lpWindowName,
@@ -65,21 +50,14 @@ typedef _FindWindowWDart = int Function(
   Pointer<Utf16> lpWindowName,
 );
 
-typedef _FindWindowExWC = IntPtr Function(
-  IntPtr hWndParent,
-  IntPtr hWndChildAfter,
-  Pointer<Utf16> lpszClass,
-  Pointer<Utf16> lpszWindow,
-);
-typedef _FindWindowExWDart = int Function(
-  int hWndParent,
-  int hWndChildAfter,
-  Pointer<Utf16> lpszClass,
-  Pointer<Utf16> lpszWindow,
-);
+typedef _GetForegroundWindowC = IntPtr Function();
+typedef _GetForegroundWindowDart = int Function();
 
-typedef _SetParentC = IntPtr Function(IntPtr hWndChild, IntPtr hWndNewParent);
-typedef _SetParentDart = int Function(int hWndChild, int hWndNewParent);
+typedef _GetActiveWindowC = IntPtr Function();
+typedef _GetActiveWindowDart = int Function();
+
+typedef _ClientToScreenC = Int32 Function(IntPtr hWnd, Pointer<_POINT> lpPoint);
+typedef _ClientToScreenDart = int Function(int hWnd, Pointer<_POINT> lpPoint);
 
 typedef _GetWindowLongPtrWC = IntPtr Function(IntPtr hWnd, Int32 nIndex);
 typedef _GetWindowLongPtrWDart = int Function(int hWnd, int nIndex);
@@ -127,26 +105,20 @@ typedef _PostMessageWDart = int Function(
   int lParam,
 );
 
-typedef _IsWindowVisibleC = Int32 Function(IntPtr hWnd);
-typedef _IsWindowVisibleDart = int Function(int hWnd);
-
-/// Windows native implementation of window reparenting and docking via Win32 user32/kernel32.
+/// Windows native implementation of seamless borderless window docking and owner binding.
 class ScrcpyDockWin32 implements ScrcpyDockService {
   ScrcpyDockWin32() {
     _initFfi();
   }
 
-  late final _GetCurrentProcessIdDart _getCurrentProcessId;
-  late final _EnumWindowsDart _enumWindows;
-  late final _GetWindowThreadProcessIdDart _getWindowThreadProcessId;
   late final _FindWindowWDart _findWindow;
-  late final _FindWindowExWDart _findWindowEx;
-  late final _SetParentDart _setParent;
+  late final _GetForegroundWindowDart _getForegroundWindow;
+  late final _GetActiveWindowDart _getActiveWindow;
+  late final _ClientToScreenDart _clientToScreen;
   late final _GetWindowLongPtrWDart _getWindowLongPtr;
   late final _SetWindowLongPtrWDart _setWindowLongPtr;
   late final _SetWindowPosDart _setWindowPos;
   late final _PostMessageWDart _postMessage;
-  late final _IsWindowVisibleDart _isWindowVisible;
 
   int _scrcpyHwnd = 0;
   int _parentHwnd = 0;
@@ -154,28 +126,21 @@ class ScrcpyDockWin32 implements ScrcpyDockService {
   bool _docked = false;
 
   void _initFfi() {
-    final kernel32 = DynamicLibrary.open('kernel32.dll');
     final user32 = DynamicLibrary.open('user32.dll');
 
-    _getCurrentProcessId = kernel32
-        .lookupFunction<_GetCurrentProcessIdC, _GetCurrentProcessIdDart>(
-          'GetCurrentProcessId',
-        );
-
-    _enumWindows = user32.lookupFunction<_EnumWindowsC, _EnumWindowsDart>(
-      'EnumWindows',
-    );
-    _getWindowThreadProcessId = user32.lookupFunction<
-      _GetWindowThreadProcessIdC,
-      _GetWindowThreadProcessIdDart
-    >('GetWindowThreadProcessId');
     _findWindow = user32.lookupFunction<_FindWindowWC, _FindWindowWDart>(
       'FindWindowW',
     );
-    _findWindowEx = user32.lookupFunction<_FindWindowExWC, _FindWindowExWDart>(
-      'FindWindowExW',
-    );
-    _setParent = user32.lookupFunction<_SetParentC, _SetParentDart>('SetParent');
+    _getForegroundWindow = user32
+        .lookupFunction<_GetForegroundWindowC, _GetForegroundWindowDart>(
+          'GetForegroundWindow',
+        );
+    _getActiveWindow = user32
+        .lookupFunction<_GetActiveWindowC, _GetActiveWindowDart>(
+          'GetActiveWindow',
+        );
+    _clientToScreen = user32
+        .lookupFunction<_ClientToScreenC, _ClientToScreenDart>('ClientToScreen');
     _getWindowLongPtr = user32.lookupFunction<
       _GetWindowLongPtrWC,
       _GetWindowLongPtrWDart
@@ -190,59 +155,45 @@ class ScrcpyDockWin32 implements ScrcpyDockService {
     _postMessage = user32.lookupFunction<_PostMessageWC, _PostMessageWDart>(
       'PostMessageW',
     );
-    _isWindowVisible = user32
-        .lookupFunction<_IsWindowVisibleC, _IsWindowVisibleDart>(
-          'IsWindowVisible',
-        );
   }
 
   @override
   bool get isSupported => Platform.isWindows;
 
-  int? _findFlutterHwnd() {
-    if (!Platform.isWindows) return null;
-    final currentPid = _getCurrentProcessId();
-    int rootHwnd = 0;
+  int _findFlutterHwnd() {
+    if (!Platform.isWindows) return 0;
 
-    final callback = NativeCallable<_EnumWindowsProc>.isolateLocal((
-      int hwnd,
-      int lParam,
-    ) {
-      final pidPtr = calloc<Uint32>();
-      _getWindowThreadProcessId(hwnd, pidPtr);
-      final pid = pidPtr.value;
-      calloc.free(pidPtr);
+    int hwnd = _getForegroundWindow();
+    if (hwnd != 0) return hwnd;
 
-      if (pid == currentPid && _isWindowVisible(hwnd) != 0) {
-        rootHwnd = hwnd;
-        return 0; // stop enumeration
-      }
-      return 1; // continue
-    }, exceptionalReturn: 0);
+    hwnd = _getActiveWindow();
+    if (hwnd != 0) return hwnd;
 
-    _enumWindows(callback.nativeFunction, 0);
-    callback.close();
+    final classPtr = 'FLUTTER_RUNNER_WIN32_WINDOW'.toNativeUtf16();
+    hwnd = _findWindow(classPtr, nullptr);
+    calloc.free(classPtr);
+    if (hwnd != 0) return hwnd;
 
-    if (rootHwnd == 0) return null;
+    final titlePtr = 'wcat'.toNativeUtf16();
+    hwnd = _findWindow(nullptr, titlePtr);
+    calloc.free(titlePtr);
 
-    final viewClassPtr = 'FLUTTERVIEW'.toNativeUtf16();
-    final viewHwnd = _findWindowEx(rootHwnd, 0, viewClassPtr, nullptr);
-    calloc.free(viewClassPtr);
-
-    return viewHwnd != 0 ? viewHwnd : rootHwnd;
+    return hwnd;
   }
+
+  bool _isClosed = false;
 
   Future<int?> _findScrcpyHwnd(
     String title, {
-    Duration timeout = const Duration(seconds: 4),
+    Duration timeout = const Duration(seconds: 8),
   }) async {
     final titlePtr = title.toNativeUtf16();
     final stopwatch = Stopwatch()..start();
     try {
-      while (stopwatch.elapsed < timeout) {
+      while (stopwatch.elapsed < timeout && !_isClosed) {
         final hwnd = _findWindow(nullptr, titlePtr);
         if (hwnd != 0) return hwnd;
-        await Future.delayed(const Duration(milliseconds: 60));
+        await Future.delayed(const Duration(milliseconds: 80));
       }
     } finally {
       calloc.free(titlePtr);
@@ -258,31 +209,32 @@ class ScrcpyDockWin32 implements ScrcpyDockService {
   }) async {
     if (!isSupported) return false;
 
-    final parent = _findFlutterHwnd();
-    if (parent == null || parent == 0) return false;
-    _parentHwnd = parent;
-
     final scrcpy = await _findScrcpyHwnd(windowTitle);
     if (scrcpy == null || scrcpy == 0) return false;
 
     _scrcpyHwnd = scrcpy;
     _docked = true;
 
+    final flutterHwnd = _findFlutterHwnd();
+    if (flutterHwnd != 0) {
+      _parentHwnd = flutterHwnd;
+      // Set Flutter window as owner so scrcpy window stays above Flutter and minimizes with Flutter
+      _setWindowLongPtr(_scrcpyHwnd, _gwlpHwndParent, _parentHwnd);
+    }
+
     _originalStyle = _getWindowLongPtr(_scrcpyHwnd, _gwlStyle);
 
-    int newStyle = _originalStyle;
-    newStyle &= ~(
-      _wsPopup |
+    // Keep top-level WS_POPUP style to allow Direct3D11 flip-model presentation
+    int borderlessStyle = _originalStyle;
+    borderlessStyle &= ~(
       _wsCaption |
       _wsThickFrame |
       _wsMinimizeBox |
       _wsMaximizeBox |
       _wsSysMenu
     );
-    newStyle |= (_wsChild | _wsVisible | _wsClipSiblings);
-    _setWindowLongPtr(_scrcpyHwnd, _gwlStyle, newStyle);
-
-    _setParent(_scrcpyHwnd, _parentHwnd);
+    borderlessStyle |= (_wsPopup | _wsVisible);
+    _setWindowLongPtr(_scrcpyHwnd, _gwlStyle, borderlessStyle);
 
     updateBounds(bounds: bounds, devicePixelRatio: devicePixelRatio);
     return true;
@@ -295,62 +247,57 @@ class ScrcpyDockWin32 implements ScrcpyDockService {
   }) {
     if (_scrcpyHwnd == 0 || !_docked) return;
 
-    final x = (bounds.left * devicePixelRatio).round();
-    final y = (bounds.top * devicePixelRatio).round();
-    final w = (bounds.width * devicePixelRatio).round();
-    final h = (bounds.height * devicePixelRatio).round();
+    int screenX = (bounds.left * devicePixelRatio).round();
+    int screenY = (bounds.top * devicePixelRatio).round();
+    final screenW = (bounds.width * devicePixelRatio).round();
+    final screenH = (bounds.height * devicePixelRatio).round();
+
+    if (_parentHwnd != 0) {
+      final pt = calloc<_POINT>();
+      pt.ref.x = screenX;
+      pt.ref.y = screenY;
+      final ok = _clientToScreen(_parentHwnd, pt);
+      if (ok != 0) {
+        screenX = pt.ref.x;
+        screenY = pt.ref.y;
+      }
+      calloc.free(pt);
+    }
 
     _setWindowPos(
       _scrcpyHwnd,
       _hwndTop,
-      x,
-      y,
-      w,
-      h,
+      screenX,
+      screenY,
+      screenW,
+      screenH,
       _swpNoActivate | _swpFrameChanged | _swpShowWindow,
     );
   }
 
   @override
   void undock() {
-    if (_scrcpyHwnd == 0 || !_docked) return;
+    if (_scrcpyHwnd == 0) return;
     _docked = false;
 
-    _setParent(_scrcpyHwnd, 0); // 0 = Desktop root
+    // Remove owner window
+    _setWindowLongPtr(_scrcpyHwnd, _gwlpHwndParent, 0);
 
-    int restoredStyle =
-        _originalStyle != 0
-            ? _originalStyle
-            : (
-              _wsPopup |
-              _wsVisible |
-              _wsCaption |
-              _wsThickFrame |
-              _wsSysMenu
-            );
-    restoredStyle &= ~_wsChild;
-    restoredStyle |= (
-      _wsPopup |
-      _wsVisible |
-      _wsCaption |
-      _wsThickFrame |
-      _wsSysMenu
-    );
-    _setWindowLongPtr(_scrcpyHwnd, _gwlStyle, restoredStyle);
-
+    // Reposition as independent floating desktop window
     _setWindowPos(
       _scrcpyHwnd,
       _hwndTop,
       120,
       120,
-      400,
-      800,
+      420,
+      850,
       _swpFrameChanged | _swpShowWindow,
     );
   }
 
   @override
   void close() {
+    _isClosed = true;
     if (_scrcpyHwnd != 0) {
       _postMessage(_scrcpyHwnd, _wmClose, 0, 0);
       _scrcpyHwnd = 0;

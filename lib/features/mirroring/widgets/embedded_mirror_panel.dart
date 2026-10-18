@@ -15,12 +15,14 @@ class EmbeddedMirrorPanel extends StatefulWidget {
     required this.serial,
     required this.onClose,
     this.panelWidth = 380,
+    this.dockService,
   });
 
   final MirrorController controller;
   final String? serial;
   final VoidCallback onClose;
   final double panelWidth;
+  final ScrcpyDockService? dockService;
 
   @override
   State<EmbeddedMirrorPanel> createState() => _EmbeddedMirrorPanelState();
@@ -38,7 +40,7 @@ class _EmbeddedMirrorPanelState extends State<EmbeddedMirrorPanel> {
   @override
   void initState() {
     super.initState();
-    _dockService = ScrcpyDockService();
+    _dockService = widget.dockService ?? ScrcpyDockService();
     _startAndDockMirror();
   }
 
@@ -122,9 +124,8 @@ class _EmbeddedMirrorPanelState extends State<EmbeddedMirrorPanel> {
     setState(() {
       _isConnecting = false;
       _lastBounds = bounds;
-      if (!success && _dockService.isSupported) {
-        // Docking retry or floating fallback
-        _errorMessage = null;
+      if (!success) {
+        _errorMessage = 'Could not dock mirror window. Click Pop Out to view.';
       }
     });
   }

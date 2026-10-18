@@ -825,9 +825,17 @@ class LogcatBridgeServer {
     final session = _getOrCreateSession(serial);
     final borderless = req.uri.queryParameters['borderless'] != 'false';
     final title = req.uri.queryParameters['title'];
+    final x = int.tryParse(req.uri.queryParameters['x'] ?? '');
+    final y = int.tryParse(req.uri.queryParameters['y'] ?? '');
+    final width = int.tryParse(req.uri.queryParameters['width'] ?? '');
+    final height = int.tryParse(req.uri.queryParameters['height'] ?? '');
     final result = await session.launchScrcpy(
       borderless: borderless,
       customTitle: title,
+      x: x,
+      y: y,
+      width: width,
+      height: height,
     );
     req.response.headers.contentType = ContentType.json;
     if (result['status'] == 'error') {

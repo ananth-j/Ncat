@@ -189,6 +189,10 @@ class MirrorController {
     String? serial,
     bool borderless = true,
     String? customTitle,
+    int? x,
+    int? y,
+    int? width,
+    int? height,
   }) async {
     final targetSerial = serial ?? activeSerial;
     if (targetSerial == null) {
@@ -206,6 +210,10 @@ class MirrorController {
         'serial': targetSerial,
         'borderless': borderless.toString(),
         'title': title,
+        if (x != null) 'x': x.toString(),
+        if (y != null) 'y': y.toString(),
+        if (width != null) 'width': width.toString(),
+        if (height != null) 'height': height.toString(),
       },
     );
 

@@ -586,6 +586,10 @@ class DeviceSession {
   Future<Map<String, dynamic>> launchScrcpy({
     bool borderless = true,
     String? customTitle,
+    int? x,
+    int? y,
+    int? width,
+    int? height,
   }) async {
     if (_isDisposed) {
       return {'status': 'error', 'message': 'Device session disposed'};
@@ -609,11 +613,21 @@ class DeviceSession {
       '--window-title',
       title,
       if (borderless) '--window-borderless',
+      if (x != null) '--window-x=$x',
+      if (y != null) '--window-y=$y',
+      if (width != null) '--window-width=$width',
+      if (height != null) '--window-height=$height',
     ];
 
     try {
       final p = await processRunner.start(executable, args);
       _scrcpyProcess = p;
+      p.stdout.transform(const SystemEncoding().decoder).listen((d) {
+        _system('[scrcpy] ${d.trim()}');
+      });
+      p.stderr.transform(const SystemEncoding().decoder).listen((d) {
+        _system('[scrcpy err] ${d.trim()}');
+      });
       p.exitCode.then((code) {
         if (_scrcpyProcess == p) {
           _scrcpyProcess = null;

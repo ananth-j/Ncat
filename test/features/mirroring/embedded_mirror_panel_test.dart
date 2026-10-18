@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wcat/features/mirroring/mirror_controller.dart';
 import 'package:wcat/features/mirroring/services/capture_client.dart';
+import 'package:wcat/features/mirroring/services/scrcpy_dock_stub.dart';
 import 'package:wcat/features/mirroring/widgets/embedded_mirror_panel.dart';
 
 class _FakeClient implements CaptureClient {
@@ -69,6 +70,7 @@ void main() {
               controller: controller,
               serial: 'emulator-5554',
               onClose: () => closed = true,
+              dockService: ScrcpyDockStub(),
             ),
           ),
         ),
@@ -111,6 +113,7 @@ void main() {
               controller: controller,
               serial: 'emulator-5554',
               onClose: () {},
+              dockService: ScrcpyDockStub(),
             ),
           ),
         ),
