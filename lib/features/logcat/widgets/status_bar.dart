@@ -124,10 +124,7 @@ class LogcatStatusBar extends StatelessWidget {
             ),
             const SizedBox(width: 10),
           ],
-          Text(
-            '$visibleCount of $totalCount lines',
-            style: textStyle,
-          ),
+          Text('$visibleCount of $totalCount lines', style: textStyle),
         ],
       ),
     );

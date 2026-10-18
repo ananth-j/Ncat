@@ -20,20 +20,20 @@ class FilterPreset {
   final bool useRegex;
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'package': package,
-        'search': search,
-        'minLevel': minLevel,
-        'useRegex': useRegex,
-      };
+    'name': name,
+    'package': package,
+    'search': search,
+    'minLevel': minLevel,
+    'useRegex': useRegex,
+  };
 
   factory FilterPreset.fromJson(Map<String, dynamic> j) => FilterPreset(
-        name: j['name'] as String,
-        package: j['package'] as String? ?? '',
-        search: j['search'] as String? ?? '',
-        minLevel: j['minLevel'] as String? ?? 'V',
-        useRegex: j['useRegex'] as bool? ?? false,
-      );
+    name: j['name'] as String,
+    package: j['package'] as String? ?? '',
+    search: j['search'] as String? ?? '',
+    minLevel: j['minLevel'] as String? ?? 'V',
+    useRegex: j['useRegex'] as bool? ?? false,
+  );
 }
 
 Future<List<FilterPreset>> loadFilterPresets() async {

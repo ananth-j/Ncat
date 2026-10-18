@@ -16,7 +16,7 @@ void main() {
             'level': 'D',
             'tag': 'TestTag',
             'msg': 'History item',
-          }
+          },
         ],
       });
 
@@ -38,7 +38,7 @@ void main() {
             'level': 'E',
             'tag': 'ErrTag',
             'msg': 'Something failed',
-          }
+          },
         ],
       });
 

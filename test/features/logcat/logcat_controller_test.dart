@@ -19,8 +19,16 @@ void main() {
     controller.dispose();
   });
 
-  LogEntry createEntry(int seq, String level, String tag, String msg,
-      {String? pkg, int pid = 100, int tid = 101, String time = '10-04 12:00:00.000'}) {
+  LogEntry createEntry(
+    int seq,
+    String level,
+    String tag,
+    String msg, {
+    String? pkg,
+    int pid = 100,
+    int tid = 101,
+    String time = '10-04 12:00:00.000',
+  }) {
     return LogEntry(
       seq: seq,
       time: time,
@@ -35,9 +43,7 @@ void main() {
 
   group('LogcatController message & buffer management', () {
     test('HistoryMessage replaces buffer and recomputes visible list', () {
-      final initialEntries = [
-        createEntry(1, 'I', 'InitTag', 'Init message'),
-      ];
+      final initialEntries = [createEntry(1, 'I', 'InitTag', 'Init message')];
       controller.handleMessage(HistoryMessage(initialEntries));
 
       expect(controller.lines.length, 1);
@@ -56,38 +62,42 @@ void main() {
     });
 
     test('LogBatchMessage appends entries to buffer', () {
-      controller.handleMessage(LogBatchMessage([
-        createEntry(1, 'I', 'Tag1', 'Message 1'),
-      ]));
+      controller.handleMessage(
+        LogBatchMessage([createEntry(1, 'I', 'Tag1', 'Message 1')]),
+      );
       expect(controller.lines.length, 1);
 
-      controller.handleMessage(LogBatchMessage([
-        createEntry(2, 'E', 'Tag2', 'Message 2'),
-      ]));
+      controller.handleMessage(
+        LogBatchMessage([createEntry(2, 'E', 'Tag2', 'Message 2')]),
+      );
       expect(controller.lines.length, 2);
       expect(controller.lines.last.level, 'E');
     });
 
     test('LogBatchMessage is ignored when controller is paused', () {
-      controller.handleMessage(LogBatchMessage([
-        createEntry(1, 'I', 'Tag1', 'Message 1'),
-      ]));
+      controller.handleMessage(
+        LogBatchMessage([createEntry(1, 'I', 'Tag1', 'Message 1')]),
+      );
       expect(controller.lines.length, 1);
 
       controller.togglePaused();
       expect(controller.paused, isTrue);
 
-      controller.handleMessage(LogBatchMessage([
-        createEntry(2, 'E', 'Tag2', 'Message 2 while paused'),
-      ]));
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(2, 'E', 'Tag2', 'Message 2 while paused'),
+        ]),
+      );
       expect(controller.lines.length, 1);
 
       controller.togglePaused();
       expect(controller.paused, isFalse);
 
-      controller.handleMessage(LogBatchMessage([
-        createEntry(3, 'D', 'Tag3', 'Message 3 after resume'),
-      ]));
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(3, 'D', 'Tag3', 'Message 3 after resume'),
+        ]),
+      );
       expect(controller.lines.length, 2);
     });
 
@@ -110,10 +120,12 @@ void main() {
     });
 
     test('ClearMessage clears all lines and visible entries', () {
-      controller.handleMessage(LogBatchMessage([
-        createEntry(1, 'I', 'Tag1', 'Message 1'),
-        createEntry(2, 'E', 'Tag2', 'Message 2'),
-      ]));
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(1, 'I', 'Tag1', 'Message 1'),
+          createEntry(2, 'E', 'Tag2', 'Message 2'),
+        ]),
+      );
       expect(controller.lines.length, 2);
 
       controller.handleMessage(const ClearMessage());
@@ -122,15 +134,17 @@ void main() {
     });
 
     test('StatusMessage updates server state and device list', () {
-      controller.handleMessage(const StatusMessage(
-        status: 'streaming',
-        package: 'com.example.app',
-        pid: 9999,
-        devices: [
-          DeviceInfo(serial: 'DEV123', model: 'Pixel 8', authorized: true),
-        ],
-        activeDevice: 'DEV123',
-      ));
+      controller.handleMessage(
+        const StatusMessage(
+          status: 'streaming',
+          package: 'com.example.app',
+          pid: 9999,
+          devices: [
+            DeviceInfo(serial: 'DEV123', model: 'Pixel 8', authorized: true),
+          ],
+          activeDevice: 'DEV123',
+        ),
+      );
 
       expect(controller.serverStatus, 'streaming');
       expect(controller.appPid, 9999);
@@ -141,14 +155,28 @@ void main() {
 
   group('LogcatController filtering logic', () {
     setUp(() {
-      controller.handleMessage(LogBatchMessage([
-        createEntry(1, 'V', 'Network', 'Verbose ping'),
-        createEntry(2, 'D', 'Database', 'Debug query SELECT *'),
-        createEntry(3, 'I', 'Auth', 'User logged in successfully', pkg: 'com.app.auth'),
-        createEntry(4, 'W', 'Storage', 'Low disk space warning'),
-        createEntry(5, 'E', 'Payment', 'Transaction failed timeout', pkg: 'com.app.pay'),
-        createEntry(6, 'F', 'Kernel', 'Fatal crash assert failure'),
-      ]));
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(1, 'V', 'Network', 'Verbose ping'),
+          createEntry(2, 'D', 'Database', 'Debug query SELECT *'),
+          createEntry(
+            3,
+            'I',
+            'Auth',
+            'User logged in successfully',
+            pkg: 'com.app.auth',
+          ),
+          createEntry(4, 'W', 'Storage', 'Low disk space warning'),
+          createEntry(
+            5,
+            'E',
+            'Payment',
+            'Transaction failed timeout',
+            pkg: 'com.app.pay',
+          ),
+          createEntry(6, 'F', 'Kernel', 'Fatal crash assert failure'),
+        ]),
+      );
     });
 
     test('filters by minimum severity rank', () {
@@ -157,11 +185,17 @@ void main() {
 
       controller.setMinLevel('I');
       expect(controller.visible.length, 4);
-      expect(controller.visible.map((e) => e.level), containsAllInOrder(['I', 'W', 'E', 'F']));
+      expect(
+        controller.visible.map((e) => e.level),
+        containsAllInOrder(['I', 'W', 'E', 'F']),
+      );
 
       controller.setMinLevel('E');
       expect(controller.visible.length, 2);
-      expect(controller.visible.map((e) => e.level), containsAllInOrder(['E', 'F']));
+      expect(
+        controller.visible.map((e) => e.level),
+        containsAllInOrder(['E', 'F']),
+      );
     });
 
     test('filters by text search across message and tag', () {
@@ -212,18 +246,20 @@ void main() {
     });
 
     test('formats log string correctly on export', () async {
-      controller.handleMessage(LogBatchMessage([
-        createEntry(
-          1,
-          'I',
-          'AuthTag',
-          'Export message test',
-          pkg: 'com.test.app',
-          time: '10-04 12:34:56.789',
-          pid: 4000,
-          tid: 4001,
-        ),
-      ]));
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(
+            1,
+            'I',
+            'AuthTag',
+            'Export message test',
+            pkg: 'com.test.app',
+            time: '10-04 12:34:56.789',
+            pid: 4000,
+            tid: 4001,
+          ),
+        ]),
+      );
 
       // Verify that export doesn't throw and formats properly
       final exportString = await controller.exportLogs();

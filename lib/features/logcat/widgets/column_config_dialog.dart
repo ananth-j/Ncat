@@ -17,7 +17,8 @@ Future<void> showColumnConfigDialog({
       return StatefulBuilder(
         builder: (dialogContext, setDialogState) {
           Widget presetBtn(String label, LogColumnConfig config) {
-            final active = columns.showTime == config.showTime &&
+            final active =
+                columns.showTime == config.showTime &&
                 columns.showPidTid == config.showPidTid &&
                 columns.showPackage == config.showPackage &&
                 columns.showLevel == config.showLevel &&
@@ -27,12 +28,15 @@ Future<void> showColumnConfigDialog({
                 style: FilledButton.styleFrom(
                   backgroundColor: palette.accent,
                   foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4)),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
                 onPressed: () {},
                 child: Text(label, style: const TextStyle(fontSize: 11)),
@@ -42,12 +46,15 @@ Future<void> showColumnConfigDialog({
               style: OutlinedButton.styleFrom(
                 foregroundColor: palette.text,
                 side: BorderSide(color: palette.border),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4)),
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
               onPressed: () {
                 onUpdateColumns(config);
@@ -70,8 +77,10 @@ Future<void> showColumnConfigDialog({
                 onTap: () => onChanged(!value),
                 borderRadius: BorderRadius.circular(4),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 4,
+                  ),
                   child: Row(
                     children: [
                       Checkbox(
@@ -242,7 +251,8 @@ Future<void> showColumnConfigDialog({
                             backgroundColor: palette.accent,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4)),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                           ),
                           onPressed: () => Navigator.of(dialogContext).pop(),
                           child: const Text('Done'),
@@ -270,56 +280,78 @@ List<PopupMenuEntry<void>> buildColumnMenuItems({
     CheckedPopupMenuItem<void>(
       checked: columns.showTime,
       value: null,
-      onTap: () => onUpdateColumns(columns.copyWith(showTime: !columns.showTime)),
-      child: Text('Timestamp (TIME)',
-          style: TextStyle(fontSize: 12, color: palette.text)),
+      onTap:
+          () => onUpdateColumns(columns.copyWith(showTime: !columns.showTime)),
+      child: Text(
+        'Timestamp (TIME)',
+        style: TextStyle(fontSize: 12, color: palette.text),
+      ),
     ),
     CheckedPopupMenuItem<void>(
       checked: columns.showPidTid,
       value: null,
-      onTap: () =>
-          onUpdateColumns(columns.copyWith(showPidTid: !columns.showPidTid)),
-      child: Text('PID-TID',
-          style: TextStyle(fontSize: 12, color: palette.text)),
+      onTap:
+          () => onUpdateColumns(
+            columns.copyWith(showPidTid: !columns.showPidTid),
+          ),
+      child: Text(
+        'PID-TID',
+        style: TextStyle(fontSize: 12, color: palette.text),
+      ),
     ),
     CheckedPopupMenuItem<void>(
       checked: columns.showPackage,
       value: null,
-      onTap: () =>
-          onUpdateColumns(columns.copyWith(showPackage: !columns.showPackage)),
-      child: Text('Package Name',
-          style: TextStyle(fontSize: 12, color: palette.text)),
+      onTap:
+          () => onUpdateColumns(
+            columns.copyWith(showPackage: !columns.showPackage),
+          ),
+      child: Text(
+        'Package Name',
+        style: TextStyle(fontSize: 12, color: palette.text),
+      ),
     ),
     CheckedPopupMenuItem<void>(
       checked: columns.showLevel,
       value: null,
-      onTap: () =>
-          onUpdateColumns(columns.copyWith(showLevel: !columns.showLevel)),
-      child: Text('Log Level (LVL)',
-          style: TextStyle(fontSize: 12, color: palette.text)),
+      onTap:
+          () =>
+              onUpdateColumns(columns.copyWith(showLevel: !columns.showLevel)),
+      child: Text(
+        'Log Level (LVL)',
+        style: TextStyle(fontSize: 12, color: palette.text),
+      ),
     ),
     CheckedPopupMenuItem<void>(
       checked: columns.showTag,
       value: null,
       onTap: () => onUpdateColumns(columns.copyWith(showTag: !columns.showTag)),
-      child: Text('Tag (TAG)',
-          style: TextStyle(fontSize: 12, color: palette.text)),
+      child: Text(
+        'Tag (TAG)',
+        style: TextStyle(fontSize: 12, color: palette.text),
+      ),
     ),
     const PopupMenuDivider(),
     PopupMenuItem<void>(
       onTap: () => onUpdateColumns(LogColumnConfig.standard),
-      child: Text('Reset: Standard View (All)',
-          style: TextStyle(fontSize: 12, color: palette.text)),
+      child: Text(
+        'Reset: Standard View (All)',
+        style: TextStyle(fontSize: 12, color: palette.text),
+      ),
     ),
     PopupMenuItem<void>(
       onTap: () => onUpdateColumns(LogColumnConfig.compact),
-      child: Text('Preset: Compact View',
-          style: TextStyle(fontSize: 12, color: palette.text)),
+      child: Text(
+        'Preset: Compact View',
+        style: TextStyle(fontSize: 12, color: palette.text),
+      ),
     ),
     PopupMenuItem<void>(
       onTap: () => onUpdateColumns(LogColumnConfig.messageOnly),
-      child: Text('Preset: Message Only',
-          style: TextStyle(fontSize: 12, color: palette.text)),
+      child: Text(
+        'Preset: Message Only',
+        style: TextStyle(fontSize: 12, color: palette.text),
+      ),
     ),
   ];
 }

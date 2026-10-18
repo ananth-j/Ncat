@@ -35,8 +35,11 @@ Future<void> showPresetsDialog({
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.bookmark_outline,
-                            size: 18, color: palette.accent),
+                        Icon(
+                          Icons.bookmark_outline,
+                          size: 18,
+                          color: palette.accent,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Filter Presets',
@@ -66,12 +69,16 @@ Future<void> showPresetsDialog({
                             height: 34,
                             child: TextField(
                               controller: nameCtrl,
-                              style:
-                                  TextStyle(fontSize: 12, color: palette.text),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: palette.text,
+                              ),
                               decoration: InputDecoration(
                                 hintText: 'Preset name',
                                 hintStyle: TextStyle(
-                                    fontSize: 12, color: palette.dim),
+                                  fontSize: 12,
+                                  color: palette.dim,
+                                ),
                                 filled: true,
                                 fillColor: palette.bg,
                                 isDense: true,
@@ -115,8 +122,10 @@ Future<void> showPresetsDialog({
                             nameCtrl.clear();
                             setDialogState(() {});
                           },
-                          child: const Text('Save current',
-                              style: TextStyle(fontSize: 12)),
+                          child: const Text(
+                            'Save current',
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
                       ],
                     ),
@@ -136,10 +145,9 @@ Future<void> showPresetsDialog({
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: presets.length,
-                          separatorBuilder: (_, __) => Divider(
-                            height: 1,
-                            color: palette.border,
-                          ),
+                          separatorBuilder:
+                              (_, __) =>
+                                  Divider(height: 1, color: palette.border),
                           itemBuilder: (context, i) {
                             final p = presets[i];
                             final details = [
@@ -151,8 +159,9 @@ Future<void> showPresetsDialog({
                             return Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                hoverColor:
-                                    palette.selectedBg.withValues(alpha: 0.5),
+                                hoverColor: palette.selectedBg.withValues(
+                                  alpha: 0.5,
+                                ),
                                 borderRadius: BorderRadius.circular(4),
                                 onTap: () {
                                   onApplyPreset(p);
@@ -213,7 +222,8 @@ Future<void> showPresetsDialog({
                       children: [
                         TextButton(
                           style: TextButton.styleFrom(
-                              foregroundColor: palette.text),
+                            foregroundColor: palette.text,
+                          ),
                           onPressed: () => Navigator.of(dialogContext).pop(),
                           child: const Text('Close'),
                         ),

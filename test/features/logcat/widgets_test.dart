@@ -44,9 +44,7 @@ void main() {
             minLevel: 'V',
             useRegex: false,
             appPid: 1234,
-            devices: const [
-              DeviceInfo(serial: 'DEV1', model: 'Pixel 8'),
-            ],
+            devices: const [DeviceInfo(serial: 'DEV1', model: 'Pixel 8')],
             pickedDevice: 'DEV1',
             onSearch: (v) => searchVal = v,
             onLevel: (_) {},
@@ -118,7 +116,9 @@ void main() {
   });
 
   group('LogcatStatusBar Widget Tests', () {
-    testWidgets('displays server status, active device, and metrics', (tester) async {
+    testWidgets('displays server status, active device, and metrics', (
+      tester,
+    ) async {
       setDesktopSize(tester);
 
       await tester.pumpWidget(
@@ -127,9 +127,7 @@ void main() {
             connection: 'live',
             serverStatus: 'streaming logcat',
             activeDevice: 'DEV123',
-            devices: [
-              DeviceInfo(serial: 'DEV123', model: 'Galaxy S24'),
-            ],
+            devices: [DeviceInfo(serial: 'DEV123', model: 'Galaxy S24')],
             appPid: 5432,
             paused: true,
             autoScroll: false,
@@ -149,61 +147,64 @@ void main() {
   });
 
   group('LogRow Widget Tests', () {
-    testWidgets('renders all columns and displays context menu on secondary tap', (tester) async {
-      setDesktopSize(tester);
+    testWidgets(
+      'renders all columns and displays context menu on secondary tap',
+      (tester) async {
+        setDesktopSize(tester);
 
-      const entry = LogEntry(
-        seq: 1,
-        time: '10-18 10:20:30.123',
-        pid: 1234,
-        tid: 1235,
-        level: 'E',
-        tag: 'TestTag',
-        msg: 'Something went wrong',
-        pkg: 'com.example.app',
-      );
+        const entry = LogEntry(
+          seq: 1,
+          time: '10-18 10:20:30.123',
+          pid: 1234,
+          tid: 1235,
+          level: 'E',
+          tag: 'TestTag',
+          msg: 'Something went wrong',
+          pkg: 'com.example.app',
+        );
 
-      bool copyCalled = false;
-      String filterTag = '';
+        bool copyCalled = false;
+        String filterTag = '';
 
-      await tester.pumpWidget(
-        wrapWithTheme(
-          LogRow(
-            entry: entry,
-            columns: LogColumnConfig.standard,
-            wrap: true,
-            onCopy: () => copyCalled = true,
-            onFilterTag: () => filterTag = 'TestTag',
-            onFilterPackage: (_) {},
+        await tester.pumpWidget(
+          wrapWithTheme(
+            LogRow(
+              entry: entry,
+              columns: LogColumnConfig.standard,
+              wrap: true,
+              onCopy: () => copyCalled = true,
+              onFilterTag: () => filterTag = 'TestTag',
+              onFilterPackage: (_) {},
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('10-18 10:20:30.123'), findsOneWidget);
-      expect(find.text('1234-1235'), findsOneWidget);
-      expect(find.text('com.example.app'), findsOneWidget);
-      expect(find.text('E'), findsOneWidget);
-      expect(find.text('TestTag'), findsOneWidget);
-      expect(find.text('Something went wrong'), findsOneWidget);
+        expect(find.text('10-18 10:20:30.123'), findsOneWidget);
+        expect(find.text('1234-1235'), findsOneWidget);
+        expect(find.text('com.example.app'), findsOneWidget);
+        expect(find.text('E'), findsOneWidget);
+        expect(find.text('TestTag'), findsOneWidget);
+        expect(find.text('Something went wrong'), findsOneWidget);
 
-      // Right-click / Secondary tap
-      await tester.tapAt(tester.getCenter(find.byType(LogRow)), buttons: 2);
-      await tester.pumpAndSettle();
+        // Right-click / Secondary tap
+        await tester.tapAt(tester.getCenter(find.byType(LogRow)), buttons: 2);
+        await tester.pumpAndSettle();
 
-      expect(find.text('Copy full line'), findsOneWidget);
-      expect(find.text('Filter by tag: "TestTag"'), findsOneWidget);
+        expect(find.text('Copy full line'), findsOneWidget);
+        expect(find.text('Filter by tag: "TestTag"'), findsOneWidget);
 
-      // Tap Copy full line
-      await tester.tap(find.text('Copy full line'));
-      await tester.pumpAndSettle();
-      expect(copyCalled, isTrue);
+        // Tap Copy full line
+        await tester.tap(find.text('Copy full line'));
+        await tester.pumpAndSettle();
+        expect(copyCalled, isTrue);
 
-      // Open context menu again and tap Filter by tag
-      await tester.tapAt(tester.getCenter(find.byType(LogRow)), buttons: 2);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Filter by tag: "TestTag"'));
-      await tester.pumpAndSettle();
-      expect(filterTag, 'TestTag');
-    });
+        // Open context menu again and tap Filter by tag
+        await tester.tapAt(tester.getCenter(find.byType(LogRow)), buttons: 2);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Filter by tag: "TestTag"'));
+        await tester.pumpAndSettle();
+        expect(filterTag, 'TestTag');
+      },
+    );
   });
 }

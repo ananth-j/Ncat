@@ -64,14 +64,17 @@ class DevicePicker extends StatelessWidget {
                     height: 6,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: devices.isNotEmpty
-                          ? palette.levelColor['I']
-                          : palette.dim,
+                      color:
+                          devices.isNotEmpty
+                              ? palette.levelColor['I']
+                              : palette.dim,
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Text('Auto-select',
-                      style: TextStyle(fontSize: 12, color: palette.text)),
+                  Text(
+                    'Auto-select',
+                    style: TextStyle(fontSize: 12, color: palette.text),
+                  ),
                 ],
               ),
             ),
@@ -86,9 +89,10 @@ class DevicePicker extends StatelessWidget {
                       height: 6,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: d.authorized
-                            ? palette.levelColor['I']
-                            : palette.levelColor['W'],
+                        color:
+                            d.authorized
+                                ? palette.levelColor['I']
+                                : palette.levelColor['W'],
                       ),
                     ),
                     const SizedBox(width: 6),

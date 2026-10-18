@@ -74,10 +74,7 @@ class LogTableView extends StatelessWidget {
                         children: [
                           Icon(Icons.arrow_downward, size: 14),
                           SizedBox(width: 4),
-                          Text(
-                            'Scroll to end',
-                            style: TextStyle(fontSize: 11),
-                          ),
+                          Text('Scroll to end', style: TextStyle(fontSize: 11)),
                         ],
                       ),
                     ),
@@ -180,16 +177,19 @@ class LogTableView extends StatelessWidget {
                     color: palette.dim,
                   ),
                   const SizedBox(width: 4),
-                  Text('Columns',
-                      style: TextStyle(fontSize: 11, color: palette.dim)),
+                  Text(
+                    'Columns',
+                    style: TextStyle(fontSize: 11, color: palette.dim),
+                  ),
                 ],
               ),
             ),
-            itemBuilder: (context) => buildColumnMenuItems(
-              palette: palette,
-              columns: columns,
-              onUpdateColumns: onUpdateColumns,
-            ),
+            itemBuilder:
+                (context) => buildColumnMenuItems(
+                  palette: palette,
+                  columns: columns,
+                  onUpdateColumns: onUpdateColumns,
+                ),
           ),
         ],
       ),
@@ -226,6 +226,7 @@ class LogTableView extends StatelessWidget {
         interactive: true,
         child: ListView.builder(
           controller: scrollController,
+          itemExtent: wrap ? null : 24.0,
           padding: const EdgeInsets.symmetric(vertical: 2),
           itemCount: entries.length,
           itemBuilder: (context, i) {

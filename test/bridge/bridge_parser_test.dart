@@ -28,8 +28,7 @@ void main() {
       expect(match, isNotNull);
       expect(match!.group(4), 'F');
       expect(match.group(5), 'libc');
-      expect(match.group(6),
-          'Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR)');
+      expect(match.group(6), 'Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR)');
     });
 
     test('parses log line with tag containing symbols or dots', () {

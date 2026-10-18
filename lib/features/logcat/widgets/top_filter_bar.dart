@@ -85,21 +85,29 @@ class TopFilterBar extends StatelessWidget {
           filled: true,
           fillColor: palette.bg,
           isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 7,
+          ),
           prefixIcon: Icon(Icons.phone_android, size: 13, color: palette.dim),
-          prefixIconConstraints:
-              const BoxConstraints(minWidth: 26, minHeight: 26),
-          suffixIconConstraints:
-              const BoxConstraints(minWidth: 26, minHeight: 26),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 26,
+            minHeight: 26,
+          ),
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 26,
+            minHeight: 26,
+          ),
           suffixIcon: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (pkgCtrl.text.isNotEmpty)
                 IconButton(
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 20, minHeight: 20),
+                  constraints: const BoxConstraints(
+                    minWidth: 20,
+                    minHeight: 20,
+                  ),
                   icon: Icon(Icons.close, size: 12, color: palette.dim),
                   onPressed: () {
                     pkgCtrl.clear();
@@ -109,8 +117,10 @@ class TopFilterBar extends StatelessWidget {
               else if (appPid != null)
                 Container(
                   margin: const EdgeInsets.only(right: 6),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: palette.accentBg,
                     borderRadius: BorderRadius.circular(4),
@@ -157,13 +167,19 @@ class TopFilterBar extends StatelessWidget {
             filled: true,
             fillColor: palette.bg,
             isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 7,
+            ),
             prefixIcon: Icon(Icons.search, size: 14, color: palette.dim),
-            prefixIconConstraints:
-                const BoxConstraints(minWidth: 26, minHeight: 26),
-            suffixIconConstraints:
-                const BoxConstraints(minWidth: 60, minHeight: 26),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 26,
+              minHeight: 26,
+            ),
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: 60,
+              minHeight: 26,
+            ),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -174,10 +190,11 @@ class TopFilterBar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(3),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 2),
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        color:
-                            useRegex ? palette.accentBg : Colors.transparent,
+                        color: useRegex ? palette.accentBg : Colors.transparent,
                         borderRadius: BorderRadius.circular(3),
                         border: Border.all(
                           color: useRegex ? palette.accent : Colors.transparent,
@@ -201,8 +218,10 @@ class TopFilterBar extends StatelessWidget {
                     message: 'Clear search',
                     child: IconButton(
                       padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 20, minHeight: 20),
+                      constraints: const BoxConstraints(
+                        minWidth: 20,
+                        minHeight: 20,
+                      ),
                       icon: Icon(Icons.close, size: 12, color: palette.dim),
                       onPressed: () {
                         searchCtrl.clear();
@@ -248,30 +267,31 @@ class TopFilterBar extends StatelessWidget {
           isDense: true,
           dropdownColor: palette.panel,
           icon: Icon(Icons.arrow_drop_down, size: 16, color: palette.dim),
-          items: kLevels.map((l) {
-            final col = palette.levelColor[l] ?? palette.dim;
-            return DropdownMenuItem<String>(
-              value: l,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: col,
-                    ),
+          items:
+              kLevels.map((l) {
+                final col = palette.levelColor[l] ?? palette.dim;
+                return DropdownMenuItem<String>(
+                  value: l,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: col,
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Text(
+                        kLevelNames[l] ?? l,
+                        style: TextStyle(fontSize: 12, color: palette.text),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 7),
-                  Text(
-                    kLevelNames[l] ?? l,
-                    style: TextStyle(fontSize: 12, color: palette.text),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
+                );
+              }).toList(),
           onChanged: (v) {
             if (v != null) onLevel(v);
           },

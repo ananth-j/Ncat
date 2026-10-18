@@ -150,7 +150,8 @@ class _LogRowState extends State<LogRow> {
       height: 1.4,
     );
 
-    final appPkg = widget.entry.pkg ??
+    final appPkg =
+        widget.entry.pkg ??
         (widget.appPid != null && widget.entry.pid == widget.appPid
             ? (widget.packageFilter != null && widget.packageFilter!.isNotEmpty
                 ? widget.packageFilter!
@@ -163,9 +164,10 @@ class _LogRowState extends State<LogRow> {
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
         child: Container(
-          color: _hovered
-              ? palette.selectedBg.withValues(alpha: 0.4)
-              : Colors.transparent,
+          color:
+              _hovered
+                  ? palette.selectedBg.withValues(alpha: 0.4)
+                  : Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,11 +275,7 @@ class _LogRowState extends State<LogRow> {
                 child: Tooltip(
                   message: 'Copy line',
                   child: IconButton(
-                    icon: Icon(
-                      Icons.copy,
-                      size: 12,
-                      color: palette.dim,
-                    ),
+                    icon: Icon(Icons.copy, size: 12, color: palette.dim),
                     onPressed: widget.onCopy,
                   ),
                 ),

@@ -24,14 +24,14 @@ void main() {
 
   test('LogEntry.rank orders severity from V to F', () {
     LogEntry level(String l) => LogEntry.fromJson({
-          'seq': 0,
-          'time': '',
-          'pid': 0,
-          'tid': 0,
-          'level': l,
-          'tag': '',
-          'msg': '',
-        });
+      'seq': 0,
+      'time': '',
+      'pid': 0,
+      'tid': 0,
+      'level': l,
+      'tag': '',
+      'msg': '',
+    });
 
     expect(level('V').rank, lessThan(level('D').rank));
     expect(level('D').rank, lessThan(level('I').rank));
@@ -99,44 +99,50 @@ void main() {
     expect(darkTheme.extension<AppPalette>(), equals(kDarkModernPalette));
   });
 
-  testWidgets('DropdownButton renders device items without unbounded width error', (tester) async {
-    const devices = [
-      DeviceInfo(serial: 'ROHQDY59QSG6EM6H', model: 'RMX3870'),
-    ];
+  testWidgets(
+    'DropdownButton renders device items without unbounded width error',
+    (tester) async {
+      const devices = [
+        DeviceInfo(serial: 'ROHQDY59QSG6EM6H', model: 'RMX3870'),
+      ];
 
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(Brightness.dark, kDarkModernPalette),
-        home: Scaffold(
-          body: Center(
-            child: SizedBox(
-              width: 220,
-              child: DropdownButton<String?>(
-                value: 'ROHQDY59QSG6EM6H',
-                items: [
-                  for (final d in devices)
-                    DropdownMenuItem<String?>(
-                      value: d.serial,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(width: 6),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 150),
-                            child: Text(d.label, overflow: TextOverflow.ellipsis),
-                          ),
-                        ],
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(Brightness.dark, kDarkModernPalette),
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 220,
+                child: DropdownButton<String?>(
+                  value: 'ROHQDY59QSG6EM6H',
+                  items: [
+                    for (final d in devices)
+                      DropdownMenuItem<String?>(
+                        value: d.serial,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(width: 6),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 150),
+                              child: Text(
+                                d.label,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                ],
-                onChanged: null,
+                  ],
+                  onChanged: null,
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    expect(find.text('RMX3870 (ROHQDY59QSG6EM6H)'), findsOneWidget);
-  });
+      expect(find.text('RMX3870 (ROHQDY59QSG6EM6H)'), findsOneWidget);
+    },
+  );
 }

@@ -3,25 +3,25 @@ import 'package:flutter/material.dart';
 import '../../../src/palette.dart';
 
 AppThemeChoice _nextThemeChoice(AppThemeChoice choice) => switch (choice) {
-      AppThemeChoice.system => AppThemeChoice.light,
-      AppThemeChoice.light => AppThemeChoice.darkModern,
-      AppThemeChoice.darkModern => AppThemeChoice.vsDark,
-      AppThemeChoice.vsDark => AppThemeChoice.system,
-    };
+  AppThemeChoice.system => AppThemeChoice.light,
+  AppThemeChoice.light => AppThemeChoice.darkModern,
+  AppThemeChoice.darkModern => AppThemeChoice.vsDark,
+  AppThemeChoice.vsDark => AppThemeChoice.system,
+};
 
 IconData _themeChoiceIcon(AppThemeChoice choice) => switch (choice) {
-      AppThemeChoice.system => Icons.brightness_auto,
-      AppThemeChoice.light => Icons.light_mode,
-      AppThemeChoice.darkModern => Icons.dark_mode,
-      AppThemeChoice.vsDark => Icons.contrast,
-    };
+  AppThemeChoice.system => Icons.brightness_auto,
+  AppThemeChoice.light => Icons.light_mode,
+  AppThemeChoice.darkModern => Icons.dark_mode,
+  AppThemeChoice.vsDark => Icons.contrast,
+};
 
 String _themeChoiceLabel(AppThemeChoice choice) => switch (choice) {
-      AppThemeChoice.system => 'Theme: Auto (System)',
-      AppThemeChoice.light => 'Theme: Modern Light',
-      AppThemeChoice.darkModern => 'Theme: Dark Modern',
-      AppThemeChoice.vsDark => 'Theme: VS Dark',
-    };
+  AppThemeChoice.system => 'Theme: Auto (System)',
+  AppThemeChoice.light => 'Theme: Modern Light',
+  AppThemeChoice.darkModern => 'Theme: Dark Modern',
+  AppThemeChoice.vsDark => 'Theme: VS Dark',
+};
 
 /// Left-hand vertical toolbar for quick actions (pause, clear, wrap, export, presets, theme).
 class LeftVerticalToolbar extends StatelessWidget {
@@ -41,6 +41,13 @@ class LeftVerticalToolbar extends StatelessWidget {
     required this.onPresets,
     required this.onConfigureColumns,
     required this.onThemeChoice,
+    this.onScreenshot,
+    this.onToggleRecord,
+    this.onToggleMirror,
+    this.isRecording = false,
+    this.isTakingScreenshot = false,
+    this.isMirrorOpen = false,
+    this.recordingDuration = Duration.zero,
   });
 
   final bool paused;
@@ -57,6 +64,13 @@ class LeftVerticalToolbar extends StatelessWidget {
   final VoidCallback onPresets;
   final VoidCallback onConfigureColumns;
   final ValueChanged<AppThemeChoice> onThemeChoice;
+  final VoidCallback? onScreenshot;
+  final VoidCallback? onToggleRecord;
+  final VoidCallback? onToggleMirror;
+  final bool isRecording;
+  final bool isTakingScreenshot;
+  final bool isMirrorOpen;
+  final Duration recordingDuration;
 
   @override
   Widget build(BuildContext context) {
@@ -154,6 +168,40 @@ class LeftVerticalToolbar extends StatelessWidget {
             onTap: onRestart,
             palette: palette,
           ),
+          const SizedBox(height: 6),
+          Container(width: 24, height: 1, color: palette.border),
+          const SizedBox(height: 6),
+
+          // Screenshot (Phase 3)
+          if (onScreenshot != null) ...[
+            _toolButton(
+              icon: Icons.camera_alt_outlined,
+              tooltip: 'Take Screenshot (Ctrl+Shift+S)',
+              onTap: onScreenshot!,
+              active: isTakingScreenshot,
+              palette: palette,
+            ),
+            const SizedBox(height: 4),
+          ],
+
+          // Screen Record (Phase 3)
+          if (onToggleRecord != null) ...[
+            _recordButton(palette),
+            const SizedBox(height: 4),
+          ],
+
+          // Screen Mirror (Phase 4)
+          if (onToggleMirror != null) ...[
+            _toolButton(
+              icon: Icons.screen_share_outlined,
+              tooltip: 'Toggle Screen Mirror (Ctrl+Shift+M)',
+              onTap: onToggleMirror!,
+              active: isMirrorOpen,
+              palette: palette,
+            ),
+            const SizedBox(height: 4),
+          ],
+
           const Spacer(),
 
           // Theme switcher
@@ -198,6 +246,49 @@ class LeftVerticalToolbar extends StatelessWidget {
             ),
           ),
           onPressed: onTap,
+        ),
+      ),
+    );
+  }
+
+  Widget _recordButton(AppPalette palette) {
+    final minutes = recordingDuration.inMinutes.toString().padLeft(2, '0');
+    final seconds = (recordingDuration.inSeconds % 60).toString().padLeft(
+      2,
+      '0',
+    );
+    final isWarning = recordingDuration.inSeconds >= 160;
+    final tooltip =
+        isRecording
+            ? '● REC $minutes:$seconds${isWarning ? ' (Approaching 3m limit!)' : ' (Max 3m)'} — Click to Stop (Ctrl+Shift+R)'
+            : 'Record Screen (Ctrl+Shift+R)';
+
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox(
+        width: 32,
+        height: 32,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          icon: Icon(
+            isRecording ? Icons.stop_circle : Icons.fiber_manual_record,
+            size: 16,
+            color: isRecording ? const Color(0xFFE53935) : palette.dim,
+          ),
+          style: IconButton.styleFrom(
+            backgroundColor:
+                isRecording
+                    ? const Color(0xFFE53935).withValues(alpha: 0.15)
+                    : Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+              side: BorderSide(
+                color:
+                    isRecording ? const Color(0xFFE53935) : Colors.transparent,
+              ),
+            ),
+          ),
+          onPressed: onToggleRecord,
         ),
       ),
     );
