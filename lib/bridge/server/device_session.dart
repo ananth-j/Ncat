@@ -580,8 +580,13 @@ class DeviceSession {
     return false;
   }
 
-  /// Launches an external scrcpy window for this device serial with zero host CPU cost.
-  Future<Map<String, dynamic>> launchScrcpy() async {
+  Process? _scrcpyProcess;
+
+  /// Launches scrcpy for this device serial with zero host CPU cost.
+  Future<Map<String, dynamic>> launchScrcpy({
+    bool borderless = true,
+    String? customTitle,
+  }) async {
     if (_isDisposed) {
       return {'status': 'error', 'message': 'Device session disposed'};
     }
@@ -595,23 +600,54 @@ class DeviceSession {
       };
     }
 
+    await stopScrcpy();
+
+    final title = customTitle ?? 'wcat_mirror_$serial';
+    final args = <String>[
+      '-s',
+      serial,
+      '--window-title',
+      title,
+      if (borderless) '--window-borderless',
+    ];
+
     try {
-      final p = await processRunner.start(executable, [
-        '-s',
-        serial,
-        '--window-title',
-        'wcat mirror - $serial',
-      ]);
+      final p = await processRunner.start(executable, args);
+      _scrcpyProcess = p;
+      p.exitCode.then((code) {
+        if (_scrcpyProcess == p) {
+          _scrcpyProcess = null;
+        }
+      });
       _system(
-        'Launched scrcpy window for $serial (PID ${p.pid}) using $executable',
+        'Launched scrcpy for $serial (PID ${p.pid}, title "$title") using $executable',
       );
-      return {'status': 'launched', 'serial': serial, 'pid': p.pid};
+      return {
+        'status': 'launched',
+        'serial': serial,
+        'pid': p.pid,
+        'windowTitle': title,
+      };
     } catch (e) {
       return {
         'status': 'error',
         'message': 'Failed to launch scrcpy ($executable): $e',
       };
     }
+  }
+
+  /// Stops any running scrcpy process for this session.
+  Future<bool> stopScrcpy() async {
+    final p = _scrcpyProcess;
+    _scrcpyProcess = null;
+    if (p != null) {
+      try {
+        p.kill();
+        _system('Stopped scrcpy process for $serial (PID ${p.pid})');
+        return true;
+      } catch (_) {}
+    }
+    return false;
   }
 
   /// Disposes this session, terminating all associated processes.
@@ -645,6 +681,7 @@ class DeviceSession {
       } catch (_) {}
     }
 
+    await stopScrcpy();
     await killOrphans();
   }
 }

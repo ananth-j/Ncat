@@ -175,33 +175,74 @@ class MirrorController {
   /// Status of the last scrcpy launch attempt ('launched', 'not_installed', 'error').
   final ValueNotifier<String?> lastScrcpyStatus = ValueNotifier<String?>(null);
 
-  /// Launches external scrcpy window with detailed status return.
-  Future<String> launchScrcpyWithStatus({String? serial}) async {
+  /// Whether the screen mirror panel is active/open in the app.
+  final ValueNotifier<bool> isMirrorOpen = ValueNotifier<bool>(false);
+
+  /// Whether the mirror is currently docked inside the Wcat panel (true) or undocked/floating (false).
+  final ValueNotifier<bool> isDocked = ValueNotifier<bool>(true);
+
+  /// The active scrcpy window title used for Win32 docking.
+  String getScrcpyTitle(String serial) => 'wcat_mirror_$serial';
+
+  /// Launches scrcpy with options for docking and borderless mode.
+  Future<String> launchScrcpyWithStatus({
+    String? serial,
+    bool borderless = true,
+    String? customTitle,
+  }) async {
     final targetSerial = serial ?? activeSerial;
     if (targetSerial == null) {
       lastScrcpyStatus.value = 'error';
       return 'error';
     }
 
+    final title = customTitle ?? getScrcpyTitle(targetSerial);
     final uri = Uri(
       scheme: 'http',
       host: _bridgeHost,
       port: _bridgePort,
       path: '/api/scrcpy/launch',
-      queryParameters: {'serial': targetSerial},
+      queryParameters: {
+        'serial': targetSerial,
+        'borderless': borderless.toString(),
+        'title': title,
+      },
     );
 
     final res = await _client.postJson(uri);
     final status = res?['status']?.toString() ?? 'error';
     lastScrcpyStatus.value = status;
 
-    if (status == 'launched') {
-      errorMessage.value = null;
-    } else {
-      errorMessage.value =
-          res?['message']?.toString() ?? 'scrcpy not found in system PATH';
+    if (!_isDisposed) {
+      if (status == 'launched') {
+        errorMessage.value = null;
+        isMirrorOpen.value = true;
+      } else {
+        errorMessage.value =
+            res?['message']?.toString() ?? 'scrcpy not found in system PATH';
+      }
     }
     return status;
+  }
+
+  /// Stops any running scrcpy process for the device.
+  Future<bool> stopScrcpy({String? serial}) async {
+    final targetSerial = serial ?? activeSerial;
+    if (targetSerial == null) return false;
+
+    final uri = Uri(
+      scheme: 'http',
+      host: _bridgeHost,
+      port: _bridgePort,
+      path: '/api/scrcpy/stop',
+      queryParameters: {'serial': targetSerial},
+    );
+
+    final res = await _client.postJson(uri);
+    if (!_isDisposed) {
+      isMirrorOpen.value = false;
+    }
+    return res?['status'] == 'stopped';
   }
 
   /// Launches external scrcpy window (Phase 4.1 quick win, 0% host CPU overhead).
@@ -363,5 +404,7 @@ class MirrorController {
     currentFrame.dispose();
     errorMessage.dispose();
     lastScrcpyStatus.dispose();
+    isMirrorOpen.dispose();
+    isDocked.dispose();
   }
 }

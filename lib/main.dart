@@ -11,8 +11,8 @@ import 'features/logcat/widgets/status_bar.dart';
 import 'features/logcat/widgets/top_filter_bar.dart';
 import 'features/mirroring/capture_service.dart';
 import 'features/mirroring/mirror_controller.dart';
+import 'features/mirroring/widgets/embedded_mirror_panel.dart';
 import 'features/mirroring/widgets/multi_screen_grid.dart';
-import 'features/mirroring/widgets/scrcpy_install_dialog.dart';
 import 'features/mirroring/widgets/screenshot_dialog.dart';
 import 'src/palette.dart';
 import 'src/theme_pref.dart';
@@ -218,32 +218,21 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _handleLaunchMirror([String? targetSerial]) async {
+  void _handleToggleMirror([String? targetSerial]) {
     final serial = targetSerial ?? _controller.activeDevice;
     if (serial == null) {
       _notify('No device selected', isError: true);
       return;
     }
 
-    _notify('Launching scrcpy mirror for $serial...');
-    final status = await _mirrorController.launchScrcpyWithStatus(
-      serial: serial,
-    );
-    if (!mounted) return;
-
-    if (status == 'not_installed') {
-      await ScrcpyInstallDialog.show(
-        context: context,
-        controller: _mirrorController,
-        serial: serial,
-      );
-    } else if (status == 'launched') {
-      _notify('scrcpy mirror active for $serial (60 FPS)');
+    final currentlyOpen = _mirrorController.isMirrorOpen.value;
+    if (currentlyOpen) {
+      _mirrorController.isMirrorOpen.value = false;
+      _mirrorController.stopScrcpy(serial: serial);
+      _notify('Screen mirror closed');
     } else {
-      _notify(
-        _mirrorController.errorMessage.value ?? 'Failed to launch scrcpy',
-        isError: true,
-      );
+      _mirrorController.isMirrorOpen.value = true;
+      _notify('Opening embedded screen mirror for $serial (60 FPS)...');
     }
   }
 
@@ -270,7 +259,7 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
               control: true,
               shift: true,
             ):
-            _handleLaunchMirror,
+            _handleToggleMirror,
         const SingleActivator(LogicalKeyboardKey.keyL, control: true):
             _controller.clearLogs,
       },
@@ -282,6 +271,7 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
             _captureService.isRecording,
             _captureService.recordingDuration,
             _captureService.isTakingScreenshot,
+            _mirrorController.isMirrorOpen,
           ]),
           builder: (context, _) {
             return Scaffold(
@@ -350,8 +340,9 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                                   onExport: _handleExport,
                                   onScreenshot: _handleScreenshot,
                                   onToggleRecord: _handleToggleRecord,
-                                  onToggleMirror: _handleLaunchMirror,
-                                  isMirrorOpen: false,
+                                  onToggleMirror: _handleToggleMirror,
+                                  isMirrorOpen:
+                                      _mirrorController.isMirrorOpen.value,
                                   isRecording:
                                       _captureService.isRecording.value,
                                   recordingDuration:
@@ -401,6 +392,14 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                                     onUpdateColumns: _controller.updateColumns,
                                   ),
                                 ),
+
+                                // Docked in-app screen mirror panel (60 FPS hardware scrcpy)
+                                if (_mirrorController.isMirrorOpen.value)
+                                  EmbeddedMirrorPanel(
+                                    controller: _mirrorController,
+                                    serial: _controller.activeDevice,
+                                    onClose: _handleToggleMirror,
+                                  ),
                               ],
                             ),
                   ),

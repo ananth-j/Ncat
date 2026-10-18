@@ -247,6 +247,8 @@ class LogcatBridgeServer {
           await _handleStreamMjpeg(req);
         } else if (req.uri.path == '/api/scrcpy/launch') {
           await _handleScrcpyLaunch(req);
+        } else if (req.uri.path == '/api/scrcpy/stop') {
+          await _handleScrcpyStop(req);
         } else if (req.uri.path == '/api/scrcpy/status') {
           await _handleScrcpyStatus(req);
         } else if (req.uri.path == '/api/scrcpy/install') {
@@ -821,12 +823,35 @@ class LogcatBridgeServer {
     }
 
     final session = _getOrCreateSession(serial);
-    final result = await session.launchScrcpy();
+    final borderless = req.uri.queryParameters['borderless'] != 'false';
+    final title = req.uri.queryParameters['title'];
+    final result = await session.launchScrcpy(
+      borderless: borderless,
+      customTitle: title,
+    );
     req.response.headers.contentType = ContentType.json;
     if (result['status'] == 'error') {
       req.response.statusCode = HttpStatus.internalServerError;
     }
     req.response.write(jsonEncode(result));
+    await req.response.close();
+  }
+
+  Future<void> _handleScrcpyStop(HttpRequest req) async {
+    final serial = req.uri.queryParameters['serial'] ?? _activeSerial();
+    if (serial == null) {
+      req.response
+        ..statusCode = HttpStatus.badRequest
+        ..write('No active device serial provided');
+      await req.response.close();
+      return;
+    }
+    final session = _sessions[serial];
+    final stopped = await session?.stopScrcpy() ?? false;
+    req.response.headers.contentType = ContentType.json;
+    req.response.write(
+      jsonEncode({'status': stopped ? 'stopped' : 'not_running', 'serial': serial}),
+    );
     await req.response.close();
   }
 

@@ -236,5 +236,17 @@ void main() {
         expect(session, isNotNull);
       },
     );
+
+    test('POST /api/scrcpy/stop stops running scrcpy session', () async {
+      final stopReq = await client.postUrl(
+        Uri.parse('http://127.0.0.1:9889/api/scrcpy/stop?serial=device-mirror-1'),
+      );
+      final stopRes = await stopReq.close();
+      expect(stopRes.statusCode, HttpStatus.ok);
+
+      final body = jsonDecode(await utf8.decoder.bind(stopRes).join()) as Map<String, dynamic>;
+      expect(body['status'], anyOf(equals('stopped'), equals('not_running')));
+      expect(body['serial'], equals('device-mirror-1'));
+    });
   });
 }
