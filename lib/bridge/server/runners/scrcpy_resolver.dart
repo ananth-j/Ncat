@@ -27,11 +27,68 @@ class ScrcpyResolver {
   /// Optional override for testing or custom binary path.
   static String? executableOverride;
 
+  /// Optional override for testing or custom scrcpy-server jar path.
+  static String? serverOverride;
+
   /// Optional hook for overriding installer during tests.
   static Future<Map<String, dynamic>> Function({
     void Function(String msg)? onStatus,
   })?
   installerOverride;
+
+  /// Locates the scrcpy-server binary/jar on the host system.
+  static String? findScrcpyServer() {
+    if (serverOverride != null) {
+      return serverOverride!.isEmpty ? null : serverOverride;
+    }
+    if (executableOverride != null && executableOverride!.isEmpty) {
+      return null;
+    }
+
+    // 1. Environment variable override
+    final env = Platform.environment['SCRCPY_SERVER_PATH'];
+    if (env != null && env.isNotEmpty && File(env).existsSync()) {
+      return env;
+    }
+
+    // 2. Local Wcat tools directory
+    final localDir = getLocalScrcpyDir();
+    if (localDir.existsSync()) {
+      try {
+        for (final ent in localDir.listSync(recursive: true)) {
+          if (ent is File) {
+            final name = ent.uri.pathSegments.last.toLowerCase();
+            if (name == 'scrcpy-server' || name == 'scrcpy-server.jar') {
+              return ent.path;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Beside scrcpy executable if present
+    final exe = findScrcpyExecutable();
+    if (exe != null) {
+      final dir = File(exe).parent;
+      for (final name in ['scrcpy-server', 'scrcpy-server.jar']) {
+        final serverFile = File('${dir.path}${Platform.pathSeparator}$name');
+        if (serverFile.existsSync()) return serverFile.path;
+      }
+    }
+
+    // 4. Platform-specific locations
+    for (final p in [
+      '/usr/share/scrcpy/scrcpy-server',
+      '/usr/local/share/scrcpy/scrcpy-server',
+      '/opt/homebrew/share/scrcpy/scrcpy-server',
+      r'C:\scrcpy\scrcpy-server',
+      r'C:\Program Files\scrcpy\scrcpy-server',
+    ]) {
+      if (File(p).existsSync()) return p;
+    }
+
+    return null;
+  }
 
   /// Locates the scrcpy binary on the host system.
   /// Checks SCRCPY env var, Wcat local tools directory, system PATH,

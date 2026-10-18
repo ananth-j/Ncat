@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wcat/features/mirroring/mirror_controller.dart';
 import 'package:wcat/features/mirroring/services/capture_client.dart';
-import 'package:wcat/features/mirroring/services/scrcpy_dock_stub.dart';
-import 'package:wcat/features/mirroring/widgets/embedded_mirror_panel.dart';
+import 'package:wcat/features/mirroring/widgets/embedded_stream_mirror_view.dart';
 
 class _FakeClient implements CaptureClient {
   Map<String, dynamic>? mockLaunchResult;
@@ -45,7 +44,7 @@ class _FakeClient implements CaptureClient {
 }
 
 void main() {
-  group('EmbeddedMirrorPanel Widget Tests', () {
+  group('EmbeddedStreamMirrorView Widget Tests', () {
     late _FakeClient client;
     late MirrorController controller;
 
@@ -66,11 +65,10 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: EmbeddedMirrorPanel(
+            body: EmbeddedStreamMirrorView(
               controller: controller,
               serial: 'emulator-5554',
               onClose: () => closed = true,
-              dockService: ScrcpyDockStub(),
             ),
           ),
         ),
@@ -78,22 +76,23 @@ void main() {
 
       await tester.pump();
 
-      expect(find.text('Mirror • emulator-5554'), findsOneWidget);
-      expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsOneWidget);
+      expect(find.text('Screen Mirror (emulator-5554)'), findsOneWidget);
+      expect(find.text('H.264'), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_back_ios_new), findsOneWidget);
       expect(find.byIcon(Icons.circle_outlined), findsOneWidget);
       expect(find.byIcon(Icons.crop_square_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.power_settings_new_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.power_settings_new), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsOneWidget);
 
       // Tap Back button
-      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
       await tester.pump();
       expect(client.postedInputs, isNotEmpty);
       expect(client.postedInputs.last['action'], equals('key'));
       expect(client.postedInputs.last['keyCode'], equals(4));
 
       // Tap Close button
-      await tester.tap(find.byIcon(Icons.close_rounded));
+      await tester.tap(find.byIcon(Icons.close));
       await tester.pump();
       expect(closed, isTrue);
     });
@@ -109,11 +108,10 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: EmbeddedMirrorPanel(
+            body: EmbeddedStreamMirrorView(
               controller: controller,
               serial: 'emulator-5554',
               onClose: () {},
-              dockService: ScrcpyDockStub(),
             ),
           ),
         ),
@@ -122,8 +120,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('scrcpy Not Installed'), findsOneWidget);
-      expect(find.text('Install scrcpy'), findsOneWidget);
+      expect(find.text('scrcpy tools required'), findsOneWidget);
+      expect(find.text('Install Now'), findsOneWidget);
     });
   });
 }

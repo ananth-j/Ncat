@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:media_kit/media_kit.dart';
 
 import 'features/devices/widgets/device_tab_bar.dart';
 import 'features/logcat/logcat_controller.dart';
@@ -11,7 +12,7 @@ import 'features/logcat/widgets/status_bar.dart';
 import 'features/logcat/widgets/top_filter_bar.dart';
 import 'features/mirroring/capture_service.dart';
 import 'features/mirroring/mirror_controller.dart';
-import 'features/mirroring/widgets/embedded_mirror_panel.dart';
+import 'features/mirroring/widgets/embedded_stream_mirror_view.dart';
 import 'features/mirroring/widgets/multi_screen_grid.dart';
 import 'features/mirroring/widgets/screenshot_dialog.dart';
 import 'src/palette.dart';
@@ -24,7 +25,13 @@ export 'features/logcat/models/log_entry.dart';
 export 'src/column_config.dart';
 export 'src/palette.dart';
 
-void main() => runApp(const LogcatApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    MediaKit.ensureInitialized();
+  } catch (_) {}
+  runApp(const LogcatApp());
+}
 
 /// Root application widget configuring themes and initial routes.
 class LogcatApp extends StatefulWidget {
@@ -393,9 +400,9 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                                   ),
                                 ),
 
-                                // Docked in-app screen mirror panel (60 FPS hardware scrcpy)
+                                // Embedded native H.264 screen mirror view
                                 if (_mirrorController.isMirrorOpen.value)
-                                  EmbeddedMirrorPanel(
+                                  EmbeddedStreamMirrorView(
                                     controller: _mirrorController,
                                     serial: _controller.activeDevice,
                                     onClose: _handleToggleMirror,

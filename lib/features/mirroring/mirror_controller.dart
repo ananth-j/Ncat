@@ -184,9 +184,17 @@ class MirrorController {
   /// The active scrcpy window title used for Win32 docking.
   String getScrcpyTitle(String serial) => 'wcat_mirror_$serial';
 
-  /// Launches scrcpy with options for docking and borderless mode.
+  /// Returns the HTTP live stream URL for H.264 video decoding.
+  String getVideoStreamUrl([String? serial]) {
+    final target = serial ?? activeSerial ?? '';
+    return 'http://$_bridgeHost:$_bridgePort/api/stream/h264?serial=$target';
+  }
+
+  /// Launches headless scrcpy-server on device for embedded video streaming.
   Future<String> launchScrcpyWithStatus({
     String? serial,
+    int? maxFps,
+    int? maxSize,
     bool borderless = true,
     String? customTitle,
     int? x,
@@ -200,7 +208,6 @@ class MirrorController {
       return 'error';
     }
 
-    final title = customTitle ?? getScrcpyTitle(targetSerial);
     final uri = Uri(
       scheme: 'http',
       host: _bridgeHost,
@@ -208,12 +215,8 @@ class MirrorController {
       path: '/api/scrcpy/launch',
       queryParameters: {
         'serial': targetSerial,
-        'borderless': borderless.toString(),
-        'title': title,
-        if (x != null) 'x': x.toString(),
-        if (y != null) 'y': y.toString(),
-        if (width != null) 'width': width.toString(),
-        if (height != null) 'height': height.toString(),
+        if (maxFps != null) 'maxFps': maxFps.toString(),
+        if (maxSize != null) 'maxSize': maxSize.toString(),
       },
     );
 
@@ -222,12 +225,12 @@ class MirrorController {
     lastScrcpyStatus.value = status;
 
     if (!_isDisposed) {
-      if (status == 'launched') {
+      if (status == 'running' || status == 'launched') {
         errorMessage.value = null;
         isMirrorOpen.value = true;
       } else {
         errorMessage.value =
-            res?['message']?.toString() ?? 'scrcpy not found in system PATH';
+            res?['message']?.toString() ?? 'scrcpy-server not found or failed to start';
       }
     }
     return status;

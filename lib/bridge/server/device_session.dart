@@ -3,8 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../../features/mirroring/services/scrcpy_control_protocol.dart';
 import 'runners/process_runner.dart';
-import 'runners/scrcpy_resolver.dart';
+import 'runners/scrcpy_server_runner.dart';
 
 const int kHistorySize = 3000;
 
@@ -517,8 +518,23 @@ class DeviceSession {
     }
   }
 
-  /// Sends a tap event to the device at (x, y) using persistent shell stdin.
-  Future<bool> sendInputTap(int x, int y) async {
+  /// Sends a tap event to the device at (x, y) using scrcpy control socket if running,
+  /// falling back to persistent shell stdin.
+  Future<bool> sendInputTap(int x, int y, {int screenWidth = 1080, int screenHeight = 2400}) async {
+    final runner = _scrcpyRunner;
+    if (runner != null && runner.isRunning) {
+      final packets = ScrcpyControlProtocol.createTapPackets(
+        x: x,
+        y: y,
+        screenWidth: screenWidth,
+        screenHeight: screenHeight,
+      );
+      for (final p in packets) {
+        runner.sendControlPacket(p);
+      }
+      return true;
+    }
+
     await _ensureInputShell();
     final stdin = _inputStdin;
     if (stdin != null) {
@@ -536,7 +552,43 @@ class DeviceSession {
     int x2,
     int y2, [
     int durationMs = 300,
+    int screenWidth = 1080,
+    int screenHeight = 2400,
   ]) async {
+    final runner = _scrcpyRunner;
+    if (runner != null && runner.isRunning) {
+      runner.sendControlPacket(
+        ScrcpyControlProtocol.encodeTouchEvent(
+          action: ScrcpyControlProtocol.actionDown,
+          x: x1,
+          y: y1,
+          screenWidth: screenWidth,
+          screenHeight: screenHeight,
+        ),
+      );
+      await Future<void>.delayed(Duration(milliseconds: durationMs ~/ 2));
+      runner.sendControlPacket(
+        ScrcpyControlProtocol.encodeTouchEvent(
+          action: ScrcpyControlProtocol.actionMove,
+          x: x2,
+          y: y2,
+          screenWidth: screenWidth,
+          screenHeight: screenHeight,
+        ),
+      );
+      await Future<void>.delayed(Duration(milliseconds: durationMs ~/ 2));
+      runner.sendControlPacket(
+        ScrcpyControlProtocol.encodeTouchEvent(
+          action: ScrcpyControlProtocol.actionUp,
+          x: x2,
+          y: y2,
+          screenWidth: screenWidth,
+          screenHeight: screenHeight,
+        ),
+      );
+      return true;
+    }
+
     await _ensureInputShell();
     final stdin = _inputStdin;
     if (stdin != null) {
@@ -549,6 +601,15 @@ class DeviceSession {
 
   /// Sends an Android keycode (e.g. 4 for Back, 3 for Home, 187 for App Switcher).
   Future<bool> sendInputKey(int keyCode) async {
+    final runner = _scrcpyRunner;
+    if (runner != null && runner.isRunning) {
+      final packets = ScrcpyControlProtocol.createKeyPressPackets(keyCode);
+      for (final p in packets) {
+        runner.sendControlPacket(p);
+      }
+      return true;
+    }
+
     await _ensureInputShell();
     final stdin = _inputStdin;
     if (stdin != null) {
@@ -580,10 +641,19 @@ class DeviceSession {
     return false;
   }
 
-  Process? _scrcpyProcess;
+  ScrcpyServerRunner? _scrcpyRunner;
 
-  /// Launches scrcpy for this device serial with zero host CPU cost.
+  /// Returns the raw H.264 video stream from headless scrcpy-server.
+  Stream<Uint8List> get scrcpyVideoStream =>
+      _scrcpyRunner?.videoStream ?? const Stream.empty();
+
+  /// Whether the headless scrcpy-server is actively running on device.
+  bool get isScrcpyRunning => _scrcpyRunner?.isRunning ?? false;
+
+  /// Starts the headless scrcpy-server process on the device for embedded stream decoding.
   Future<Map<String, dynamic>> launchScrcpy({
+    int maxFps = 60,
+    int? maxSize,
     bool borderless = true,
     String? customTitle,
     int? x,
@@ -595,71 +665,29 @@ class DeviceSession {
       return {'status': 'error', 'message': 'Device session disposed'};
     }
 
-    final executable = ScrcpyResolver.findScrcpyExecutable();
-    if (executable == null) {
-      return {
-        'status': 'not_installed',
-        'message':
-            'scrcpy is not installed on this system. You can install it automatically in Wcat.',
-      };
-    }
-
     await stopScrcpy();
 
-    final title = customTitle ?? 'wcat_mirror_$serial';
-    final args = <String>[
-      '-s',
-      serial,
-      '--window-title',
-      title,
-      if (borderless) '--window-borderless',
-      if (x != null) '--window-x=$x',
-      if (y != null) '--window-y=$y',
-      if (width != null) '--window-width=$width',
-      if (height != null) '--window-height=$height',
-    ];
+    final runner = ScrcpyServerRunner(
+      serial: serial,
+      adbPath: adbPath,
+      processRunner: processRunner,
+      onLog: (msg) => _system(msg),
+    );
+    _scrcpyRunner = runner;
 
-    try {
-      final p = await processRunner.start(executable, args);
-      _scrcpyProcess = p;
-      p.stdout.transform(const SystemEncoding().decoder).listen((d) {
-        _system('[scrcpy] ${d.trim()}');
-      });
-      p.stderr.transform(const SystemEncoding().decoder).listen((d) {
-        _system('[scrcpy err] ${d.trim()}');
-      });
-      p.exitCode.then((code) {
-        if (_scrcpyProcess == p) {
-          _scrcpyProcess = null;
-        }
-      });
-      _system(
-        'Launched scrcpy for $serial (PID ${p.pid}, title "$title") using $executable',
-      );
-      return {
-        'status': 'launched',
-        'serial': serial,
-        'pid': p.pid,
-        'windowTitle': title,
-      };
-    } catch (e) {
-      return {
-        'status': 'error',
-        'message': 'Failed to launch scrcpy ($executable): $e',
-      };
-    }
+    final res = await runner.start(maxFps: maxFps, maxSize: maxSize);
+    return res;
   }
 
-  /// Stops any running scrcpy process for this session.
+  /// Stops any running headless scrcpy-server session for this device.
   Future<bool> stopScrcpy() async {
-    final p = _scrcpyProcess;
-    _scrcpyProcess = null;
-    if (p != null) {
-      try {
-        p.kill();
-        _system('Stopped scrcpy process for $serial (PID ${p.pid})');
-        return true;
-      } catch (_) {}
+    final runner = _scrcpyRunner;
+    _scrcpyRunner = null;
+    if (runner != null) {
+      await runner.stop();
+      await runner.dispose();
+      _system('Stopped scrcpy-server for $serial');
+      return true;
     }
     return false;
   }

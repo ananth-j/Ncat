@@ -245,6 +245,8 @@ class LogcatBridgeServer {
           await _handleStreamWs(req);
         } else if (req.uri.path == '/api/stream') {
           await _handleStreamMjpeg(req);
+        } else if (req.uri.path == '/api/stream/h264') {
+          await _handleStreamH264(req);
         } else if (req.uri.path == '/api/scrcpy/launch') {
           await _handleScrcpyLaunch(req);
         } else if (req.uri.path == '/api/scrcpy/stop') {
@@ -805,6 +807,71 @@ class LogcatBridgeServer {
     await sub.cancel();
   }
 
+  Future<void> _handleStreamH264(HttpRequest req) async {
+    final serial = req.uri.queryParameters['serial'] ?? _activeSerial();
+    if (serial == null) {
+      req.response
+        ..statusCode = HttpStatus.badRequest
+        ..write('No active device serial provided');
+      await req.response.close();
+      return;
+    }
+    if (!DeviceSession.isValidSerial(serial)) {
+      req.response
+        ..statusCode = HttpStatus.badRequest
+        ..write('Invalid device serial format: $serial');
+      await req.response.close();
+      return;
+    }
+
+    final session = _getOrCreateSession(serial);
+    if (!session.isScrcpyRunning) {
+      final res = await session.launchScrcpy();
+      if (res['status'] == 'error' || res['status'] == 'not_installed') {
+        req.response
+          ..statusCode = HttpStatus.internalServerError
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode(res));
+        await req.response.close();
+        return;
+      }
+    }
+
+    req.response.headers.set('Content-Type', 'video/h264');
+    req.response.headers.set(
+      'Cache-Control',
+      'no-cache, no-store, must-revalidate',
+    );
+    req.response.headers.set('Connection', 'close');
+    req.response.headers.set('Pragma', 'no-cache');
+
+    final completer = Completer<void>();
+    final sub = session.scrcpyVideoStream.listen(
+      (chunk) async {
+        try {
+          req.response.add(chunk);
+          await req.response.flush();
+        } catch (_) {
+          if (!completer.isCompleted) completer.complete();
+        }
+      },
+      onDone: () {
+        if (!completer.isCompleted) completer.complete();
+      },
+      onError: (_) {
+        if (!completer.isCompleted) completer.complete();
+      },
+    );
+
+    req.response.done.whenComplete(() {
+      sub.cancel();
+      if (!completer.isCompleted) completer.complete();
+    });
+
+    await completer.future;
+    await sub.cancel();
+  }
+
   Future<void> _handleScrcpyLaunch(HttpRequest req) async {
     final serial = req.uri.queryParameters['serial'] ?? _activeSerial();
     if (serial == null) {
@@ -823,19 +890,11 @@ class LogcatBridgeServer {
     }
 
     final session = _getOrCreateSession(serial);
-    final borderless = req.uri.queryParameters['borderless'] != 'false';
-    final title = req.uri.queryParameters['title'];
-    final x = int.tryParse(req.uri.queryParameters['x'] ?? '');
-    final y = int.tryParse(req.uri.queryParameters['y'] ?? '');
-    final width = int.tryParse(req.uri.queryParameters['width'] ?? '');
-    final height = int.tryParse(req.uri.queryParameters['height'] ?? '');
+    final maxFps = int.tryParse(req.uri.queryParameters['maxFps'] ?? '') ?? 60;
+    final maxSize = int.tryParse(req.uri.queryParameters['maxSize'] ?? '');
     final result = await session.launchScrcpy(
-      borderless: borderless,
-      customTitle: title,
-      x: x,
-      y: y,
-      width: width,
-      height: height,
+      maxFps: maxFps,
+      maxSize: maxSize,
     );
     req.response.headers.contentType = ContentType.json;
     if (result['status'] == 'error') {
@@ -864,12 +923,15 @@ class LogcatBridgeServer {
   }
 
   Future<void> _handleScrcpyStatus(HttpRequest req) async {
-    final path = ScrcpyResolver.findScrcpyExecutable();
+    final serverPath = ScrcpyResolver.findScrcpyServer();
+    final exePath = ScrcpyResolver.findScrcpyExecutable();
+    final installed = serverPath != null || exePath != null;
     req.response.headers.contentType = ContentType.json;
     req.response.write(
       jsonEncode({
-        'installed': path != null,
-        'path': path,
+        'installed': installed,
+        'path': exePath ?? serverPath,
+        'serverPath': serverPath,
         'version': ScrcpyResolver.version,
       }),
     );
