@@ -8,9 +8,9 @@ import '../capture_service.dart';
 import '../mirror_controller.dart';
 import 'screen_mirror_view.dart';
 
-const int kMaxConcurrentStreams = 2;
+const int kMaxConcurrentScrcpyWindows = 2;
 
-/// Responsive multi-device matrix grid with a hard cap on concurrently live streams (Phase 5).
+/// Responsive multi-device matrix grid with a cap on concurrently open scrcpy sessions.
 class MultiScreenGrid extends StatefulWidget {
   const MultiScreenGrid({
     super.key,
@@ -53,14 +53,13 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
     for (final dev in widget.devices) {
       if (!_controllers.containsKey(dev.serial)) {
         final ctrl = MirrorController();
-        ctrl.fps.value = 5; // Eco framerate for grid tiles (Phase 5.2)
         _controllers[dev.serial] = ctrl;
       }
     }
 
     // Default top devices to live up to hard cap (Phase 5.2)
     if (_liveSerials.isEmpty && widget.devices.isNotEmpty) {
-      for (final dev in widget.devices.take(kMaxConcurrentStreams)) {
+      for (final dev in widget.devices.take(kMaxConcurrentScrcpyWindows)) {
         _startTileLive(dev.serial);
       }
     }
@@ -69,8 +68,8 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
   void _startTileLive(String serial) {
     if (_liveSerials.contains(serial)) return;
 
-    // Enforce hard cap on live streams (Phase 5.2)
-    if (_liveSerials.length >= kMaxConcurrentStreams) {
+    // Keep scrcpy sessions within the multi-device cap.
+    if (_liveSerials.length >= kMaxConcurrentScrcpyWindows) {
       final toRemove = _liveSerials.first;
       _stopTileLive(toRemove);
     }
@@ -134,9 +133,9 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
   }
 
   void _mirrorAll() {
-    // Starts live stream on devices respecting the stream cap (Phase 5.3)
+    // Starts scrcpy on devices while respecting the session cap.
     _liveSerials.clear();
-    for (final dev in widget.devices.take(kMaxConcurrentStreams)) {
+    for (final dev in widget.devices.take(kMaxConcurrentScrcpyWindows)) {
       _startTileLive(dev.serial);
     }
   }
@@ -195,7 +194,7 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
                 border: Border.all(color: palette.accent),
               ),
               child: Text(
-                'Live cap: ${_liveSerials.length}/$kMaxConcurrentStreams',
+                'Scrcpy sessions: ${_liveSerials.length}/$kMaxConcurrentScrcpyWindows',
                 style: TextStyle(
                   fontSize: 10,
                   color: palette.accent,
@@ -357,7 +356,7 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
                   ),
                 ),
 
-                // Live stream toggle
+                // Scrcpy session toggle
                 if (isLive)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -370,7 +369,7 @@ class _MultiScreenGridState extends State<MultiScreenGrid> {
                       border: Border.all(color: const Color(0xFF43A047)),
                     ),
                     child: const Text(
-                      '● LIVE',
+                      '● SCRCPY',
                       style: TextStyle(
                         fontSize: 9,
                         color: Color(0xFF43A047),

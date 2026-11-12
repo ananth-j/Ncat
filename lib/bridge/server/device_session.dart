@@ -39,11 +39,10 @@ class DeviceSession {
   final void Function(Map<String, dynamic> entry)? onNewEntry;
 
   Process? _logcatProcess;
-  Process? _streamProcess;
+  Process? _scrcpyProcess;
   Process? _recordProcess;
   Process? _inputShellProcess;
   IOSink? _inputStdin;
-  int _activeStreamCount = 0;
 
   String? _packageFilter;
   int? _appPid;
@@ -66,7 +65,6 @@ class DeviceSession {
   int? get appPid => _appPid;
   List<Map<String, dynamic>> get history => List.unmodifiable(_history);
   bool get isRecording => _recordProcess != null;
-  bool get isStreaming => _streamProcess != null || _activeStreamCount > 0;
   bool get isDisposed => _isDisposed;
 
   void setPackageFilter(String? pkg) {
@@ -460,42 +458,6 @@ class DeviceSession {
     return null;
   }
 
-  /// Returns a broadcast Stream of frame bytes (PNG) captured at [fps] (1-30).
-  /// Spawns the capture loop on first subscriber and terminates it when all subscribers cancel.
-  Stream<Uint8List> streamFrames({int fps = 15}) {
-    late StreamController<Uint8List> controller;
-    Timer? frameTimer;
-    bool isCapturing = false;
-
-    final targetFps = fps.clamp(1, 30);
-    final interval = Duration(milliseconds: 1000 ~/ targetFps);
-
-    controller = StreamController<Uint8List>(
-      onListen: () {
-        _activeStreamCount++;
-        frameTimer = Timer.periodic(interval, (_) async {
-          if (isCapturing || _isDisposed || controller.isClosed) return;
-          isCapturing = true;
-          try {
-            final bytes = await takeScreenshot();
-            if (bytes != null && !controller.isClosed) {
-              controller.add(bytes);
-            }
-          } finally {
-            isCapturing = false;
-          }
-        });
-      },
-      onCancel: () {
-        _activeStreamCount = (_activeStreamCount - 1).clamp(0, 999);
-        frameTimer?.cancel();
-        frameTimer = null;
-      },
-    );
-
-    return controller.stream;
-  }
-
   Future<void> _ensureInputShell() async {
     if (_isDisposed) return;
     if (_inputShellProcess == null) {
@@ -586,6 +548,15 @@ class DeviceSession {
       return {'status': 'error', 'message': 'Device session disposed'};
     }
 
+    final existingProcess = _scrcpyProcess;
+    if (existingProcess != null) {
+      return {
+        'status': 'launched',
+        'serial': serial,
+        'pid': existingProcess.pid,
+      };
+    }
+
     final executable = ScrcpyResolver.findScrcpyExecutable();
     if (executable == null) {
       return {
@@ -602,6 +573,12 @@ class DeviceSession {
         '--window-title',
         'wcat mirror - $serial',
       ]);
+      _scrcpyProcess = p;
+      unawaited(
+        p.exitCode.then((_) {
+          if (_scrcpyProcess == p) _scrcpyProcess = null;
+        }),
+      );
       _system(
         'Launched scrcpy window for $serial (PID ${p.pid}) using $executable',
       );
@@ -614,11 +591,23 @@ class DeviceSession {
     }
   }
 
+  Future<bool> stopScrcpy() async {
+    final process = _scrcpyProcess;
+    if (process == null) return false;
+    _scrcpyProcess = null;
+    try {
+      return process.kill();
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Disposes this session, terminating all associated processes.
   Future<void> dispose() async {
     _isDisposed = true;
     _recordLimitTimer?.cancel();
     await stopLogcat();
+    await stopScrcpy();
 
     final inputP = _inputShellProcess;
     _inputShellProcess = null;
@@ -626,14 +615,6 @@ class DeviceSession {
     if (inputP != null) {
       try {
         inputP.kill();
-      } catch (_) {}
-    }
-
-    final streamP = _streamProcess;
-    _streamProcess = null;
-    if (streamP != null) {
-      try {
-        streamP.kill();
       } catch (_) {}
     }
 

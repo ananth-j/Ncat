@@ -50,7 +50,6 @@ sealed class BridgeMessage {
           activeDevice: json['device'] as String? ?? serial,
           protocolVersion: json['protocolVersion'] as int? ?? kProtocolVersion,
           isRecording: json['isRecording'] as bool? ?? false,
-          isStreaming: json['isStreaming'] as bool? ?? false,
           serial: serial,
         );
       default:
@@ -93,7 +92,6 @@ class StatusMessage extends BridgeMessage {
     this.activeDevice,
     this.protocolVersion = kProtocolVersion,
     this.isRecording = false,
-    this.isStreaming = false,
     super.serial,
   });
 
@@ -104,7 +102,6 @@ class StatusMessage extends BridgeMessage {
   final String? activeDevice;
   final int protocolVersion;
   final bool isRecording;
-  final bool isStreaming;
 }
 
 class UnknownMessage extends BridgeMessage {

@@ -6,7 +6,7 @@
 
 1. **Performance first, host footprint second, features third.** Every feature must pass the resource budget below before it ships.
 2. **The bridge is a dumb pipe.** No host-side transcoding. Let the Android device's hardware encoder do the work, and let the host's hardware decoder (or an external tool) do the decoding.
-3. **Everything on demand.** Mirror streams, recording and device polling run only while something is actually using them.
+3. **Everything on demand.** scrcpy sessions, recording and device polling run only while something is actually using them.
 4. **Security is deferred for the MVP**, with one free exception: bind the bridge to `127.0.0.1` only. Add a "not for shared networks" note to the README. Full hardening (token auth, Origin checks, serial validation, input escaping) is tracked in Phase 6.
 5. **Correctness items that are not negotiable**: valid MP4 on recording stop, no orphaned `adb` / `screenrecord` processes.
 
@@ -17,7 +17,7 @@
 | Idle, logcat connected, nothing streaming | Near-zero CPU, a few hundred MB RAM at most |
 | Window minimized / unfocused | No UI rebuilds, buffering only |
 | One mirrored device at 720p | Well under one CPU core |
-| Mirror pane collapsed | Stream process killed, CPU returns to idle |
+| Mirror pane collapsed | scrcpy process stopped, CPU returns to idle |
 
 Always measure with **release or profile builds**, never debug.
 
@@ -119,26 +119,21 @@ Always measure with **release or profile builds**, never debug.
 ## Phase 4: Screen Mirroring (Single Device, Low Footprint)
 *Objective: Real-time mirroring that doesn't burn the host CPU.*
 
-- [x] **4.1 Pick the mirroring path (in this order)**
-  1. **MVP quick win: "Launch scrcpy" button.** Lowest host cost (hardware decode), mature, no embedded view yet.
-  2. **Embedded H.264 passthrough:** bridge pipes `adb exec-out screenrecord --output-format=h264 --size 720x1600 --bit-rate 3000000 -` bytes straight to the UI. UI decodes with hardware decode (`media_kit` on desktop). **No ffmpeg transcoding on the host.**
-  3. **Fallback preview mode:** `screencap` loop at about 2 to 5 fps for devices or setups where H.264 isn't available.
-  - Note: `screenrecord` has a 3-minute limit, so restart the stream seamlessly.
+- [x] **4.1 Use scrcpy for live mirroring**
+  - scrcpy owns video capture, H.264 decoding, and touch/key input. The bridge only starts the native client.
+  - Windows hosts the scrcpy window inside the mirror pane; other desktop platforms open its own window.
 
 - [x] **4.2 On-demand lifecycle**
-  - Stream starts when the mirror pane opens; the `adb` process is killed when the pane collapses or the window is minimized.
+  - scrcpy starts when the mirror pane opens. Windows closes its embedded window when the pane collapses.
 
 - [x] **4.3 Quality controls**
-  - Resolution and bitrate presets (for example 480p, 720p). UI refresh capped around 30 fps.
+  - Use scrcpy's native resolution, bitrate, and framerate controls.
 
 - [x] **4.4 `ScreenMirrorView` widget**
-  - Aspect-ratio fitting, split view (logcat left, mirror right), collapse/expand toggle.
-  - Update via `ValueNotifier` and `RawImage` (or the video widget) inside its own `RepaintBoundary`. No `setState` per frame; keep only the latest frame; dispose old `ui.Image` frames immediately.
+  - Hosts the native scrcpy window in the split view on Windows and offers a collapse control.
 
-- [x] **4.5 Input forwarding (optional)**
-  - Use **one persistent `adb shell` session** and write `input tap` / `input swipe` commands to stdin (avoids ~100 to 300 ms process spawn per tap).
-  - Soft-keys: Back, Home, App Switcher, Power, Volume.
-  - Later: use scrcpy's control channel for smooth drags and text.
+- [x] **4.5 Input forwarding**
+  - scrcpy handles pointer, keyboard, and text input.
 
 ---
 
@@ -146,9 +141,9 @@ Always measure with **release or profile builds**, never debug.
 
 - [x] **5.1 Tabs mode** with independent filter state and log buffers per device.
 - [x] **5.2 Grid mode (2 to 4 devices)**
-  - Hard cap on concurrently live streams (for example 2 live, others show a static screenshot).
-  - Lower fps and resolution per tile; pause hidden tiles.
-- [x] **5.3 Bulk actions**: "Screenshot All" and "Mirror All" (respecting the stream cap).
+  - Hard cap on concurrent scrcpy sessions (2 live, others show a static screenshot).
+  - Let scrcpy adapt each live device; close sessions when tiles are hidden.
+- [x] **5.3 Bulk actions**: "Screenshot All" and "Mirror All" (respecting the scrcpy session cap).
 
 ---
 
@@ -190,7 +185,7 @@ Always measure with **release or profile builds**, never debug.
 - [x] **T.6 Bridge process tests** using the fake `ProcessRunner`:
   - Recording stop sends SIGINT then pulls; no orphaned processes after stop, disconnect or bridge shutdown.
   - `track-devices` output parsing and reconnect behavior.
-  - Stream lifecycle: starts on subscribe, killed on unsubscribe.
+  - scrcpy lifecycle: starts on pane open, stopped on pane collapse.
 - [x] **T.7 Session manager tests**: multiple serials, independent buffers, `dispose()` cleans up everything.
 - [x] **T.8 Protocol versioning tests**: handshake accepted and rejected cases.
 - [x] **T.9 Manual resource checklist** (release build): idle, minimized, 1-device mirror, mirror collapsed. Record CPU and RAM against the budget table.
@@ -202,7 +197,7 @@ Always measure with **release or profile builds**, never debug.
 1. Phase 1.5 foundations (`ProcessRunner`, `DeviceSession`, protocol version, `track-devices`, loopback bind)
 2. Phase 2 logcat efficiency pass
 3. Phase 3 screenshot, then recording (SIGINT and segmenting)
-4. Phase 4: scrcpy launch button, then embedded H.264 passthrough
+4. Phase 4: scrcpy native mirroring, hosted in the Windows mirror pane
 5. Phase 5 multi-device
 6. Phase 6 hardening and open-source release (CI jobs can start early)
 
@@ -213,6 +208,6 @@ Always measure with **release or profile builds**, never debug.
 | Host transcoding eats CPU | Passthrough H.264 and hardware decode only |
 | Unplayable recordings | SIGINT on device, wait for exit, then pull |
 | Orphaned `adb` processes | `DeviceSession.dispose()`, startup cleanup, tests |
-| Multi-stream resource blowup | Stream cap, per-tile limits, pause hidden tiles |
+| Multi-device resource blowup | scrcpy session cap, per-tile limits, stop hidden tiles |
 | Flaky perf tests in CI | Generous thresholds or separate tag |
 | Security debt forgotten | Phase 6.1 is tracked and README carries an MVP note |

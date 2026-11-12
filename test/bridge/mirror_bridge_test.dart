@@ -7,11 +7,10 @@ import 'package:wcat/bridge/server/runners/process_runner.dart';
 import 'package:wcat/bridge/server/runners/scrcpy_resolver.dart';
 
 void main() {
-  group('Bridge Mirroring & Input Endpoints (Phase 4)', () {
+  group('Bridge Scrcpy & Input Endpoints', () {
     late FakeProcessRunner fakeRunner;
     late LogcatBridgeServer server;
     late HttpClient client;
-    final mockPng = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
     setUp(() async {
       fakeRunner = FakeProcessRunner();
@@ -30,10 +29,6 @@ void main() {
               'device-mirror-1 device model:Pixel_Mirror\n',
           '',
         );
-      });
-
-      fakeRunner.onRun('screencap', (args) async {
-        return ProcessResult(10, 0, mockPng, '');
       });
 
       server = LogcatBridgeServer(
@@ -203,37 +198,6 @@ void main() {
         expect(shellCommands, contains('input tap 450 920'));
         expect(shellCommands, contains('input keyevent 4'));
         expect(shellCommands, contains('input swipe 100 500 100 100 200'));
-      },
-    );
-
-    test(
-      'GET /api/stream streams multipart MJPEG frames and stops on disconnect',
-      () async {
-        final req = await client.getUrl(
-          Uri.parse(
-            'http://127.0.0.1:9889/api/stream?serial=device-mirror-1&fps=15',
-          ),
-        );
-        final res = await req.close();
-
-        expect(res.statusCode, HttpStatus.ok);
-        expect(res.headers.contentType?.mimeType, 'multipart/x-mixed-replace');
-
-        // Read initial chunks to verify boundary and content type
-        final chunks = <String>[];
-        await for (final chunk in res.transform(utf8.decoder)) {
-          chunks.add(chunk);
-          if (chunks.join().contains('image/png')) break;
-        }
-        expect(chunks.join(), contains('--frame'));
-        expect(chunks.join(), contains('image/png'));
-
-        // Disconnect client
-        await res.detachSocket().then((s) => s.destroy());
-
-        // Verify session cleans up stream
-        final session = server.sessions['device-mirror-1'];
-        expect(session, isNotNull);
       },
     );
   });

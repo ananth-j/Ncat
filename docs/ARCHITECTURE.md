@@ -1,6 +1,6 @@
 # Wcat Architecture Specification
 
-`wcat` is a high-performance, low-overhead Android companion tool designed for streaming and filtering `adb logcat`, capturing low-latency screen video, injecting touch/key events, and recording device video across multiple devices.
+`wcat` is a high-performance, low-overhead Android companion tool designed for streaming and filtering `adb logcat`, capturing screenshots, mirroring screens with scrcpy, and recording device video across multiple devices.
 
 ---
 
@@ -11,8 +11,8 @@
 │                   Flutter Frontend                     │
 │  (Desktop: Windows / macOS / Linux  |  Web: Browser)   │
 └───────────────▲────────────────────────▲───────────────┘
-         Control & Logs (WS)         Video Stream (HTTP / WS)
-         JSON Batches / 100ms        Single-Frame ui.Image
+         Control & Logs (WS)         scrcpy native client
+         JSON Batches / 100ms        H.264 decode and display
                 │                                │
 ┌───────────────▼────────────────────────────────▼───────┐
 │                  Dart Bridge Server                    │
@@ -29,7 +29,7 @@
 │  │  - Dedicated `adb logcat -v epoch` process       │  │
 │  │  - Persistent `adb shell` for < 1ms input        │  │
 │  │  - Native `screenrecord` with SIGINT finalizer   │  │
-│  │  - On-demand screencap frame streamer            │  │
+│  │  - On-demand single screenshots                  │  │
 │  └──────────────────────────────────────────────────┘  │
 └───────────────────────────▲────────────────────────────┘
                             │
@@ -48,14 +48,12 @@
 Video transcoding on the host CPU is computationally expensive. Wcat treats the Dart bridge as a **dumb pipe**:
 - The bridge never runs ffmpeg, OpenCV, or software video re-encoding on the host.
 - Video recording uses the device's native hardware encoder (`screenrecord`). The bridge sends `SIGINT` (`pkill -2 screenrecord`) on the device, waits for MP4 container finalization, and pulls the completed MP4.
-- High-framerate mirroring offers two modes:
-  1. **Hardware-Accelerated Fallback**: Launch `scrcpy` in an external window (`POST /api/scrcpy/launch`), consuming 0% host CPU.
-  2. **Embedded Passthrough**: Streams lightweight PNG frames on demand via `exec-out screencap -p`, with framerate clamping (5/15/30 fps) and immediate texture disposal on the client.
+- Live mirroring uses scrcpy's device-side H.264 encoding and native client decoder. On Windows, the native scrcpy window is hosted inside the mirror pane; other desktop platforms open scrcpy in its own window.
 
-### 2.2 Stream Separation
-High-frequency video frames and low-frequency text logs are strictly isolated:
+### 2.2 Transport Separation
+Text logs and scrcpy video use independent transports:
 - **Logcat & Control**: Batched JSON messages over `ws://127.0.0.1:8080/ws` flushed every 100ms.
-- **Screen Mirror**: Dedicated stream over `GET /api/stream?serial=XYZ` (MJPEG) or `/stream` (WebSocket binary). Video data never blocks or creates backpressure on logcat ingestion.
+- **Screen Mirror**: scrcpy manages its own video transport and decoding. The bridge does not capture or forward repeating screenshots.
 
 ### 2.3 Strict Session Isolation
 All device state is encapsulated in `DeviceSession`:
@@ -69,12 +67,12 @@ All device state is encapsulated in `DeviceSession`:
 
 ### 3.1 Presentation Layer (`lib/features/`)
 - **`logcat/`**: Virtualized, high-throughput log viewer (`LogTable`). Built with custom layout renderers to handle 100,000+ lines at 60fps.
-- **`mirroring/`**: Touch-aware interactive canvas (`ScreenMirrorView`) wrapped in a `RepaintBoundary` to prevent log table repaints during video playback.
+- **`mirroring/`**: Scrcpy session controls and a native window host for the Windows mirror pane.
 - **`devices/`**: Multi-device tab bar (`DeviceTabBar`) and multi-screen grid layout (`MultiScreenGrid`).
 
 ### 3.2 State & Controller Layer
 - **`LogcatController`**: Manages view state, search queries, severity filters, column configuration, and per-device tab state (`DeviceTabState`). When the app is minimized or hidden, it enters **Background Mode**, buffering logs in memory without rebuilding the UI widget tree.
-- **`MirrorController`**: Manages stream subscription lifecycle, coordinate scaling (widget space to physical device resolution), touch event dispatch, and single-frame texture lifecycle.
+- **`MirrorController`**: Starts scrcpy on demand and tracks its pane lifecycle.
 - **`CaptureService`**: Coordinates single-shot screenshots and hardware video recording with toolbar badge countdowns.
 
 ### 3.3 Bridge Management (`lib/bridge/`)
@@ -93,10 +91,9 @@ All device state is encapsulated in `DeviceSession`:
 | Constraint | Strategy |
 |---|---|
 | **< 2% Idle CPU** | Push-based `track-devices`, periodic flush timer (100ms), no busy loops or polling. |
-| **< 5% Mirror CPU** | Host never encodes video; client clamps framerate and disposes previous `ui.Image` immediately on new frame arrival. |
+| **Low mirror overhead** | Video is encoded on-device and decoded by scrcpy; the bridge does not capture or decode a frame loop. |
 | **< 100MB RAM** | Global `StringPool` deduplicates repeated log tags and package strings. Inverted index for O(1) incremental filter evaluation. |
-| **Multi-Stream Hard Cap** | Strict 2-stream active cap (`kMaxConcurrentStreams = 2`). Other grid tiles display static thumbnail snapshots. |
-| **Zero Input Latency** | One persistent `adb shell` process per device session; commands written directly to stdin (`writeln`) reducing tap latency from ~250ms to < 1ms. |
+| **Multi-Device Hard Cap** | Strict 2-session scrcpy cap. Other grid tiles display static screenshot thumbnails. |
 
 ---
 

@@ -7,6 +7,8 @@
 #include <flutter/standard_method_codec.h>
 
 #include <memory>
+#include <map>
+#include <string>
 
 #include "win32_window.h"
 
@@ -32,7 +34,7 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       scrcpy_channel_;
-  HWND scrcpy_window_ = nullptr;
+  std::map<std::wstring, HWND> scrcpy_windows_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

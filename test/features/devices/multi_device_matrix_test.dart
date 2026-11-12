@@ -203,7 +203,7 @@ void main() {
     });
 
     testWidgets(
-      '5.2 & 5.3 MultiScreenGrid enforces 2-stream cap and bulk screenshot',
+      '5.2 & 5.3 MultiScreenGrid enforces 2-scrcpy cap and bulk screenshot',
       (tester) async {
         final mockClient = MockMatrixCaptureClient();
         final captureService = CaptureService(client: mockClient);
@@ -229,9 +229,9 @@ void main() {
           ),
         );
 
-        // Verify live cap badge is 2/2
-        expect(find.text('Live cap: 2/2'), findsOneWidget);
-        expect(find.text('● LIVE'), findsNWidgets(2));
+        // Verify scrcpy cap badge is 2/2
+        expect(find.text('Scrcpy sessions: 2/2'), findsOneWidget);
+        expect(find.text('● SCRCPY'), findsNWidgets(2));
         expect(find.text('Go Live'), findsOneWidget);
 
         // Trigger "Screenshot All" bulk action (Phase 5.3)

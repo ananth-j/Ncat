@@ -240,13 +240,10 @@ class LogcatBridgeServer {
             WebSocketTransformer.isUpgradeRequest(req)) {
           final socket = await WebSocketTransformer.upgrade(req);
           _onClient(socket);
-        } else if (req.uri.path == '/stream' &&
-            WebSocketTransformer.isUpgradeRequest(req)) {
-          await _handleStreamWs(req);
-        } else if (req.uri.path == '/api/stream') {
-          await _handleStreamMjpeg(req);
         } else if (req.uri.path == '/api/scrcpy/launch') {
           await _handleScrcpyLaunch(req);
+        } else if (req.uri.path == '/api/scrcpy/stop') {
+          await _handleScrcpyStop(req);
         } else if (req.uri.path == '/api/scrcpy/status') {
           await _handleScrcpyStatus(req);
         } else if (req.uri.path == '/api/scrcpy/install') {
@@ -561,7 +558,6 @@ class LogcatBridgeServer {
       'device': active,
       if (active != null) 'serial': active,
       'isRecording': activeSession?.isRecording ?? false,
-      'isStreaming': activeSession?.isStreaming ?? false,
     };
   }
 
@@ -713,96 +709,6 @@ class LogcatBridgeServer {
     _broadcastStatus();
   }
 
-  Future<void> _handleStreamWs(HttpRequest req) async {
-    final serial = req.uri.queryParameters['serial'] ?? _activeSerial();
-    final socket = await WebSocketTransformer.upgrade(req);
-    if (serial == null || !DeviceSession.isValidSerial(serial)) {
-      await socket.close(
-        WebSocketStatus.protocolError,
-        'Invalid or missing device serial provided',
-      );
-      return;
-    }
-
-    final session = _getOrCreateSession(serial);
-    final fps = int.tryParse(req.uri.queryParameters['fps'] ?? '') ?? 15;
-    final sub = session.streamFrames(fps: fps).listen((frame) {
-      try {
-        socket.add(frame);
-      } catch (_) {}
-    });
-
-    unawaited(
-      socket.done.whenComplete(() {
-        sub.cancel();
-      }),
-    );
-  }
-
-  Future<void> _handleStreamMjpeg(HttpRequest req) async {
-    final serial = req.uri.queryParameters['serial'] ?? _activeSerial();
-    if (serial == null) {
-      req.response
-        ..statusCode = HttpStatus.badRequest
-        ..write('No active device serial provided');
-      await req.response.close();
-      return;
-    }
-    if (!DeviceSession.isValidSerial(serial)) {
-      req.response
-        ..statusCode = HttpStatus.badRequest
-        ..write('Invalid device serial format: $serial');
-      await req.response.close();
-      return;
-    }
-
-    final session = _getOrCreateSession(serial);
-    final fps = int.tryParse(req.uri.queryParameters['fps'] ?? '') ?? 15;
-
-    req.response.headers.set(
-      'Content-Type',
-      'multipart/x-mixed-replace; boundary=frame',
-    );
-    req.response.headers.set(
-      'Cache-Control',
-      'no-cache, no-store, must-revalidate',
-    );
-    req.response.headers.set('Connection', 'close');
-    req.response.headers.set('Pragma', 'no-cache');
-
-    final completer = Completer<void>();
-    final sub = session
-        .streamFrames(fps: fps)
-        .listen(
-          (frame) async {
-            try {
-              req.response.write('--frame\r\n');
-              req.response.write('Content-Type: image/png\r\n');
-              req.response.write('Content-Length: ${frame.length}\r\n\r\n');
-              req.response.add(frame);
-              req.response.write('\r\n');
-              await req.response.flush();
-            } catch (_) {
-              if (!completer.isCompleted) completer.complete();
-            }
-          },
-          onDone: () {
-            if (!completer.isCompleted) completer.complete();
-          },
-          onError: (_) {
-            if (!completer.isCompleted) completer.complete();
-          },
-        );
-
-    req.response.done.whenComplete(() {
-      sub.cancel();
-      if (!completer.isCompleted) completer.complete();
-    });
-
-    await completer.future;
-    await sub.cancel();
-  }
-
   Future<void> _handleScrcpyLaunch(HttpRequest req) async {
     final serial = req.uri.queryParameters['serial'] ?? _activeSerial();
     if (serial == null) {
@@ -839,6 +745,24 @@ class LogcatBridgeServer {
         'path': path,
         'version': ScrcpyResolver.version,
       }),
+    );
+    await req.response.close();
+  }
+
+  Future<void> _handleScrcpyStop(HttpRequest req) async {
+    final serial = req.uri.queryParameters['serial'] ?? _activeSerial();
+    if (serial == null || !DeviceSession.isValidSerial(serial)) {
+      req.response
+        ..statusCode = HttpStatus.badRequest
+        ..write('Invalid or missing device serial provided');
+      await req.response.close();
+      return;
+    }
+
+    final stopped = await _sessions[serial]?.stopScrcpy() ?? false;
+    req.response.headers.contentType = ContentType.json;
+    req.response.write(
+      jsonEncode({'status': stopped ? 'stopped' : 'not_running'}),
     );
     await req.response.close();
   }

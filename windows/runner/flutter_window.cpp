@@ -67,8 +67,8 @@ bool FlutterWindow::OnCreate() {
             result->Success(flutter::EncodableValue(false));
             return;
           }
-          if (scrcpy_window_ != target) {
-            scrcpy_window_ = target;
+          if (scrcpy_windows_[wide_title] != target) {
+            scrcpy_windows_[wide_title] = target;
             SetParent(target, flutter_controller_->view()->GetNativeWindow());
             const LONG_PTR style = GetWindowLongPtrW(target, GWL_STYLE);
             SetWindowLongPtrW(target, GWL_STYLE,
@@ -85,10 +85,23 @@ bool FlutterWindow::OnCreate() {
           return;
         }
         if (call.method_name() == "detach") {
-          if (scrcpy_window_ && IsWindow(scrcpy_window_)) {
-            PostMessageW(scrcpy_window_, WM_CLOSE, 0, 0);
+          const auto* args =
+              std::get_if<flutter::EncodableMap>(call.arguments());
+          if (args) {
+            const auto it = args->find(flutter::EncodableValue("title"));
+            if (it != args->end() &&
+                std::holds_alternative<std::string>(it->second)) {
+              const auto title = std::get<std::string>(it->second);
+              const auto wide_title = std::wstring(title.begin(), title.end());
+              const auto window_it = scrcpy_windows_.find(wide_title);
+              if (window_it != scrcpy_windows_.end()) {
+                if (IsWindow(window_it->second)) {
+                  PostMessageW(window_it->second, WM_CLOSE, 0, 0);
+                }
+                scrcpy_windows_.erase(window_it);
+              }
+            }
           }
-          scrcpy_window_ = nullptr;
           result->Success();
           return;
         }
@@ -108,10 +121,13 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
-  if (scrcpy_window_ && IsWindow(scrcpy_window_)) {
-    PostMessageW(scrcpy_window_, WM_CLOSE, 0, 0);
-    scrcpy_window_ = nullptr;
+  for (const auto& entry : scrcpy_windows_) {
+    const auto window = entry.second;
+    if (IsWindow(window)) {
+      PostMessageW(window, WM_CLOSE, 0, 0);
+    }
   }
+  scrcpy_windows_.clear();
   scrcpy_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;

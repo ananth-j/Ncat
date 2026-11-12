@@ -13,12 +13,11 @@ All communication takes place over loopback (`127.0.0.1`).
 | Endpoint | Method / Protocol | Description | Authentication |
 |---|---|---|---|
 | `/ws` | WebSocket | Bidirectional JSON for log streaming and device commands. | Optional token via query parameter or header. |
-| `/stream` | WebSocket (Binary) | Dedicated binary frame stream for real-time video mirroring. | Optional token. |
-| `/api/stream` | HTTP GET | Multipart/x-mixed-replace MJPEG stream for screen mirroring. | Optional token. |
 | `/api/screenshot` | HTTP GET | Returns raw `image/png` bytes directly from `screencap -p`. | Optional token. |
 | `/api/record/start` | HTTP POST | Initiates native hardware `screenrecord` on the device. | Optional token. |
 | `/api/record/stop` | HTTP POST | Sends SIGINT to screenrecord on device, pulls MP4, cleans up temp file. | Optional token. |
-| `/api/scrcpy/launch`| HTTP POST | Spawns zero-host-CPU external `scrcpy` window. | Optional token. |
+| `/api/scrcpy/launch`| HTTP POST | Launches the native `scrcpy` client for the selected device. | Optional token. |
+| `/api/scrcpy/stop` | HTTP POST | Stops the scrcpy process for the selected device. | Optional token. |
 | `/api/input` | HTTP POST | Injects tap, swipe, keyevent, or text into the persistent device shell. | Optional token. |
 
 ---
@@ -72,7 +71,6 @@ Broadcast when server state, active device, package PID, or connected devices ch
   "pid": 12345,
   "device": "emulator-5554",
   "isRecording": false,
-  "isStreaming": false,
   "devices": [
     {
       "serial": "emulator-5554",
@@ -167,7 +165,7 @@ Restarts the underlying `adb logcat` process for the specified device.
 ```
 
 ### E. `scrcpy`
-Launches an external `scrcpy` window for the device.
+Launches scrcpy for the device. The desktop frontend embeds its native window on Windows.
 ```json
 {
   "cmd": "scrcpy",
@@ -244,6 +242,3 @@ Starts native hardware recording.
 
 ### `POST /api/record/stop?serial=<serial>`
 Stops recording via SIGINT, pulls the video file, cleans up on-device storage, and returns raw MP4 bytes with `Content-Type: video/mp4` and `Content-Disposition: attachment; filename="wcat_<serial>_<timestamp>.mp4"`.
-
-### `GET /api/stream?serial=<serial>&fps=<fps>`
-Provides an HTTP MJPEG stream with boundary separator `--frame`. Clamped to 1–30 FPS.
