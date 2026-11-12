@@ -1,6 +1,9 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <cstdint>
+#include <string>
+#include <variant>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -27,6 +30,71 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  scrcpy_channel_ = std::make_unique<
+      flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "wcat/scrcpy_embed",
+      &flutter::StandardMethodCodec::GetInstance());
+  scrcpy_channel_->SetMethodCallHandler(
+      [this](const auto& call, auto result) {
+        if (call.method_name() == "attach") {
+          const auto* args =
+              std::get_if<flutter::EncodableMap>(call.arguments());
+          if (!args) {
+            result->Error("bad_args", "Expected a map of window bounds");
+            return;
+          }
+          const auto get_number = [args](const char* key) -> int {
+            const auto it = args->find(flutter::EncodableValue(key));
+            if (it == args->end()) return 0;
+            if (const auto* value = std::get_if<int32_t>(&it->second)) {
+              return *value;
+            }
+            if (const auto* value = std::get_if<int64_t>(&it->second)) {
+              return static_cast<int>(*value);
+            }
+            return 0;
+          };
+          const auto it = args->find(flutter::EncodableValue("title"));
+          if (it == args->end() ||
+              !std::holds_alternative<std::string>(it->second)) {
+            result->Error("bad_args", "Expected scrcpy window title");
+            return;
+          }
+          const auto title = std::get<std::string>(it->second);
+          const auto wide_title = std::wstring(title.begin(), title.end());
+          HWND target = FindWindowW(nullptr, wide_title.c_str());
+          if (!target) {
+            result->Success(flutter::EncodableValue(false));
+            return;
+          }
+          if (scrcpy_window_ != target) {
+            scrcpy_window_ = target;
+            SetParent(target, flutter_controller_->view()->GetNativeWindow());
+            const LONG_PTR style = GetWindowLongPtrW(target, GWL_STYLE);
+            SetWindowLongPtrW(target, GWL_STYLE,
+                              (style | WS_CHILD) &
+                                  ~(WS_POPUP | WS_CAPTION | WS_THICKFRAME));
+          }
+          const int x = get_number("x");
+          const int y = get_number("y");
+          const int width = get_number("width");
+          const int height = get_number("height");
+          SetWindowPos(target, HWND_TOP, x, y, width, height,
+                       SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_FRAMECHANGED);
+          result->Success(flutter::EncodableValue(true));
+          return;
+        }
+        if (call.method_name() == "detach") {
+          if (scrcpy_window_ && IsWindow(scrcpy_window_)) {
+            PostMessageW(scrcpy_window_, WM_CLOSE, 0, 0);
+          }
+          scrcpy_window_ = nullptr;
+          result->Success();
+          return;
+        }
+        result->NotImplemented();
+      });
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
   });
@@ -40,6 +108,11 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  if (scrcpy_window_ && IsWindow(scrcpy_window_)) {
+    PostMessageW(scrcpy_window_, WM_CLOSE, 0, 0);
+    scrcpy_window_ = nullptr;
+  }
+  scrcpy_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

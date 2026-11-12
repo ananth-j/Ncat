@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:ui' as ui;
-import 'dart:ui' show Offset, Size;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'services/capture_client.dart';
@@ -26,6 +26,7 @@ class MirrorController {
   final ValueNotifier<bool> isOpen = ValueNotifier<bool>(false);
   final ValueNotifier<bool> isStreaming = ValueNotifier<bool>(false);
   final ValueNotifier<bool> isPaused = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> isScrcpyEmbedded = ValueNotifier<bool>(false);
   final ValueNotifier<int> fps = ValueNotifier<int>(15);
   final ValueNotifier<double> aspectRatio = ValueNotifier<double>(9 / 19.5);
   final ValueNotifier<ui.Image?> currentFrame = ValueNotifier<ui.Image?>(null);
@@ -48,18 +49,24 @@ class MirrorController {
     if (serial != null) activeSerial = serial;
 
     if (open) {
-      if (!isPaused.value) {
+      if (!isPaused.value && !isScrcpyEmbedded.value) {
         startStream(serial: activeSerial);
       }
     } else {
       stopStream();
+      if (isScrcpyEmbedded.value) {
+        isScrcpyEmbedded.value = false;
+        unawaited(
+          const MethodChannel('wcat/scrcpy_embed').invokeMethod<void>('detach'),
+        );
+      }
     }
   }
 
   void setFps(int newFps) {
     if (fps.value == newFps) return;
     fps.value = newFps.clamp(1, 30);
-    if (isStreaming.value) {
+    if (isStreaming.value && !isScrcpyEmbedded.value) {
       // Restart stream with new fps parameter
       startStream(serial: activeSerial);
     }
@@ -197,6 +204,10 @@ class MirrorController {
 
     if (status == 'launched') {
       errorMessage.value = null;
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+        stopStream();
+        isScrcpyEmbedded.value = true;
+      }
     } else {
       errorMessage.value =
           res?['message']?.toString() ?? 'scrcpy not found in system PATH';
@@ -208,6 +219,21 @@ class MirrorController {
   Future<bool> launchScrcpy({String? serial}) async {
     final status = await launchScrcpyWithStatus(serial: serial);
     return status == 'launched';
+  }
+
+  Future<void> stopEmbeddedScrcpy() async {
+    if (!isScrcpyEmbedded.value) return;
+    isScrcpyEmbedded.value = false;
+    try {
+      await const MethodChannel(
+        'wcat/scrcpy_embed',
+      ).invokeMethod<void>('detach');
+    } on MissingPluginException {
+      // The embedded window is only available in the Windows desktop runner.
+    }
+    if (isOpen.value && !isPaused.value) {
+      startStream(serial: activeSerial);
+    }
   }
 
   /// Checks whether scrcpy binary is installed on the host system.
@@ -350,6 +376,11 @@ class MirrorController {
   void dispose() {
     _isDisposed = true;
     stopStream();
+    if (isScrcpyEmbedded.value) {
+      unawaited(
+        const MethodChannel('wcat/scrcpy_embed').invokeMethod<void>('detach'),
+      );
+    }
 
     final oldImage = currentFrame.value;
     currentFrame.value = null;
@@ -358,6 +389,7 @@ class MirrorController {
     isOpen.dispose();
     isStreaming.dispose();
     isPaused.dispose();
+    isScrcpyEmbedded.dispose();
     fps.dispose();
     aspectRatio.dispose();
     currentFrame.dispose();

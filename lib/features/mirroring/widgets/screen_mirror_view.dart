@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../src/palette.dart';
 import '../mirror_controller.dart';
@@ -19,8 +22,57 @@ class ScreenMirrorView extends StatefulWidget {
 }
 
 class _ScreenMirrorViewState extends State<ScreenMirrorView> {
+  static const _embedChannel = MethodChannel('wcat/scrcpy_embed');
+  final GlobalKey _canvasKey = GlobalKey();
+  Timer? _embedTimer;
+  bool _syncingEmbedBounds = false;
   Offset? _panStart;
   DateTime? _panStartTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _embedTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      _syncScrcpyBounds();
+    });
+  }
+
+  Future<void> _syncScrcpyBounds() async {
+    if (_syncingEmbedBounds || !widget.controller.isScrcpyEmbedded.value) {
+      return;
+    }
+    final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+    final serial = widget.controller.activeSerial;
+    if (box == null || !box.hasSize || serial == null) return;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final origin = box.localToGlobal(Offset.zero);
+    _syncingEmbedBounds = true;
+    try {
+      await _embedChannel.invokeMethod<bool>('attach', {
+        'title': 'wcat mirror - $serial',
+        'x': (origin.dx * dpr).round(),
+        'y': (origin.dy * dpr).round(),
+        'width': (box.size.width * dpr).round(),
+        'height': (box.size.height * dpr).round(),
+      });
+    } on PlatformException {
+      // The bridge may not have finished opening scrcpy's native window yet.
+    } on MissingPluginException {
+      // Non-Windows targets keep using the regular Flutter frame stream.
+      widget.controller.isScrcpyEmbedded.value = false;
+      if (widget.controller.isOpen.value) {
+        widget.controller.startStream();
+      }
+    } finally {
+      _syncingEmbedBounds = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _embedTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,13 +158,24 @@ class _ScreenMirrorViewState extends State<ScreenMirrorView> {
           // Launch scrcpy quick-win
           Tooltip(
             message:
-                'Launch standalone scrcpy window (hardware-accelerated 60fps)',
+                defaultTargetPlatform == TargetPlatform.windows
+                    ? 'Embed smooth scrcpy playback in this pane'
+                    : 'Launch scrcpy in a separate window',
             child: IconButton(
-              icon: const Icon(Icons.open_in_new, size: 14),
+              icon: Icon(
+                defaultTargetPlatform == TargetPlatform.windows
+                    ? Icons.picture_in_picture_alt
+                    : Icons.open_in_new,
+                size: 14,
+              ),
               color: palette.dim,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
               onPressed: () async {
+                if (widget.controller.isScrcpyEmbedded.value) {
+                  await widget.controller.stopEmbeddedScrcpy();
+                  return;
+                }
                 final status = await widget.controller.launchScrcpyWithStatus();
                 if (!mounted) return;
 
@@ -221,6 +284,7 @@ class _ScreenMirrorViewState extends State<ScreenMirrorView> {
                 return AspectRatio(
                   aspectRatio: ratio,
                   child: Container(
+                    key: _canvasKey,
                     decoration: BoxDecoration(
                       color: Colors.black,
                       borderRadius: BorderRadius.circular(10),
@@ -235,80 +299,91 @@ class _ScreenMirrorViewState extends State<ScreenMirrorView> {
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: RepaintBoundary(
-                      child: ValueListenableBuilder<ui.Image?>(
-                        valueListenable: widget.controller.currentFrame,
-                        builder: (context, frame, _) {
-                          if (frame == null) {
-                            return Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.phone_android,
-                                    size: 40,
-                                    color: palette.dim.withValues(alpha: 0.4),
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: widget.controller.isScrcpyEmbedded,
+                        builder: (context, embedded, _) {
+                          if (embedded) return const SizedBox.expand();
+                          return ValueListenableBuilder<ui.Image?>(
+                            valueListenable: widget.controller.currentFrame,
+                            builder: (context, frame, _) {
+                              if (frame == null) {
+                                return Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.phone_android,
+                                        size: 40,
+                                        color: palette.dim.withValues(
+                                          alpha: 0.4,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Waiting for device frames...',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: palette.dim.withValues(
+                                            alpha: 0.7,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Waiting for device frames...',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: palette.dim.withValues(alpha: 0.7),
+                                );
+                              }
+
+                              return LayoutBuilder(
+                                builder: (context, canvasConstraints) {
+                                  final canvasSize = Size(
+                                    canvasConstraints.maxWidth,
+                                    canvasConstraints.maxHeight,
+                                  );
+
+                                  return GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTapUp: (details) {
+                                      widget.controller.sendTap(
+                                        details.localPosition,
+                                        canvasSize,
+                                      );
+                                    },
+                                    onPanStart: (details) {
+                                      _panStart = details.localPosition;
+                                      _panStartTime = DateTime.now();
+                                    },
+                                    onPanEnd: (details) {
+                                      final start = _panStart;
+                                      final startTime = _panStartTime;
+                                      _panStart = null;
+                                      _panStartTime = null;
+
+                                      if (start != null && startTime != null) {
+                                        final duration =
+                                            DateTime.now()
+                                                .difference(startTime)
+                                                .inMilliseconds;
+                                        // Use last position or drag delta
+                                        final end =
+                                            start +
+                                            details.velocity.pixelsPerSecond *
+                                                0.1;
+                                        widget.controller.sendSwipe(
+                                          start,
+                                          end,
+                                          canvasSize,
+                                          durationMs: duration.clamp(150, 1000),
+                                        );
+                                      }
+                                    },
+                                    child: RawImage(
+                                      image: frame,
+                                      fit: BoxFit.contain,
+                                      width: canvasSize.width,
+                                      height: canvasSize.height,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-
-                          return LayoutBuilder(
-                            builder: (context, canvasConstraints) {
-                              final canvasSize = Size(
-                                canvasConstraints.maxWidth,
-                                canvasConstraints.maxHeight,
-                              );
-
-                              return GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTapUp: (details) {
-                                  widget.controller.sendTap(
-                                    details.localPosition,
-                                    canvasSize,
                                   );
                                 },
-                                onPanStart: (details) {
-                                  _panStart = details.localPosition;
-                                  _panStartTime = DateTime.now();
-                                },
-                                onPanEnd: (details) {
-                                  final start = _panStart;
-                                  final startTime = _panStartTime;
-                                  _panStart = null;
-                                  _panStartTime = null;
-
-                                  if (start != null && startTime != null) {
-                                    final duration =
-                                        DateTime.now()
-                                            .difference(startTime)
-                                            .inMilliseconds;
-                                    // Use last position or drag delta
-                                    final end =
-                                        start +
-                                        details.velocity.pixelsPerSecond * 0.1;
-                                    widget.controller.sendSwipe(
-                                      start,
-                                      end,
-                                      canvasSize,
-                                      durationMs: duration.clamp(150, 1000),
-                                    );
-                                  }
-                                },
-                                child: RawImage(
-                                  image: frame,
-                                  fit: BoxFit.contain,
-                                  width: canvasSize.width,
-                                  height: canvasSize.height,
-                                ),
                               );
                             },
                           );
