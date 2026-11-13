@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help us improve Wcat
+about: Create a report to help us improve ThruWire
 title: '[BUG] '
 labels: bug
 assignees: ''

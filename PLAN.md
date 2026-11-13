@@ -1,6 +1,6 @@
-# Wcat Implementation Plan v2: MVP, Performance-First, Low Host Footprint
+# ThruWire Implementation Plan v2: MVP, Performance-First, Low Host Footprint
 
-> **Target Goal**: Evolve `wcat` from a modular logcat viewer into a lightweight Android companion tool with **screenshot**, **screen recording**, **screen mirroring**, and **multi-device** support, while keeping CPU and RAM usage on the host PC as low as possible.
+> **Target Goal**: Evolve `ThruWire` from a modular logcat viewer into a lightweight Android companion tool with **screenshot**, **screen recording**, **screen mirroring**, and **multi-device** support, while keeping CPU and RAM usage on the host PC as low as possible.
 
 ## Guiding Principles (MVP)
 
@@ -98,7 +98,7 @@ Always measure with **release or profile builds**, never debug.
 
 - [x] **3.1 Bridge capture endpoints**
   - `GET /api/screenshot?serial=` runs `adb -s <serial> exec-out screencap -p` and streams PNG bytes.
-  - `POST /api/record/start?serial=` spawns `adb -s <serial> shell screenrecord --bit-rate 6000000 /sdcard/wcat_<serial>_<timestamp>.mp4` (unique filename per session).
+  - `POST /api/record/start?serial=` spawns `adb -s <serial> shell screenrecord --bit-rate 6000000 /sdcard/ThruWire_<serial>_<timestamp>.mp4` (unique filename per session).
   - `POST /api/record/stop?serial=`:
     1. Send **SIGINT on the device** (`pkill -2 screenrecord` or `kill -2 <pid>`), **not** by killing the host `adb` process.
     2. Wait for the process to exit so the MP4 is finalized.

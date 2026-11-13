@@ -1,5 +1,5 @@
-name: wcat
-description: "Wcat: Fast, lightweight Android logcat & device companion over WebSocket with Flutter UI."
+name: thruwire
+description: "ThruWire: Fast, lightweight Android logcat & device companion over WebSocket with Flutter UI."
 publish_to: 'none'
 version: 1.0.0+1
 

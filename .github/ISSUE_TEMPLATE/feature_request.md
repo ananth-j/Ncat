@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea or feature for Wcat
+about: Suggest an idea or feature for ThruWire
 title: '[FEAT] '
 labels: enhancement
 assignees: ''
@@ -16,7 +16,7 @@ A clear and concise description of what you want to happen.
 A clear and concise description of any alternative solutions or features you've considered.
 
 **Performance Impact**
-Does this feature align with Wcat's low-footprint philosophy (< 2% idle CPU, dumb-pipe host, etc.)?
+Does this feature align with ThruWire's low-footprint philosophy (< 2% idle CPU, dumb-pipe host, etc.)?
 
 **Additional context**
 Add any other context, mockups, or screenshots about the feature request here.

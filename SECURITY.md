@@ -11,7 +11,7 @@
 
 ## Reporting a Vulnerability
 
-The Wcat team takes the security of our application and its users seriously. If you discover a security vulnerability or suspect an issue that compromises the security of Wcat or host systems, please report it privately.
+The ThruWire team takes the security of our application and its users seriously. If you discover a security vulnerability or suspect an issue that compromises the security of ThruWire or host systems, please report it privately.
 
 **Please DO NOT open a public issue.**
 
@@ -30,7 +30,7 @@ We will acknowledge receipt within 48 hours and work with you on a timeline for 
 
 ## Security Model & Hardening
 
-Wcat interacts with host operating system tools (`adb`, `scrcpy`) to stream Android system logs, video frames, and inject input events. Because it provides privileged communication with attached physical and virtual devices, Wcat implements the following layered security controls:
+ThruWire interacts with host operating system tools (`adb`, `scrcpy`) to stream Android system logs, video frames, and inject input events. Because it provides privileged communication with attached physical and virtual devices, ThruWire implements the following layered security controls:
 
 ### 1. Loopback-Only Binding
 The Dart bridge server strictly binds to the IPv4 loopback address (`127.0.0.1`). It refuses connections from external network interfaces (`0.0.0.0`), preventing unauthorized network-adjacent devices from accessing ADB or log streams.

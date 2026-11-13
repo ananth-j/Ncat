@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wcat/features/devices/models/device_info.dart';
-import 'package:wcat/features/logcat/models/log_entry.dart';
-import 'package:wcat/features/logcat/widgets/left_vertical_toolbar.dart';
-import 'package:wcat/features/logcat/widgets/log_row.dart';
-import 'package:wcat/features/logcat/widgets/status_bar.dart';
-import 'package:wcat/features/logcat/widgets/top_filter_bar.dart';
-import 'package:wcat/src/column_config.dart';
-import 'package:wcat/src/palette.dart';
+import 'package:thruwire/features/devices/models/device_info.dart';
+import 'package:thruwire/features/logcat/models/log_entry.dart';
+import 'package:thruwire/features/logcat/widgets/left_vertical_toolbar.dart';
+import 'package:thruwire/features/logcat/widgets/log_row.dart';
+import 'package:thruwire/features/logcat/widgets/status_bar.dart';
+import 'package:thruwire/features/logcat/widgets/top_filter_bar.dart';
+import 'package:thruwire/src/column_config.dart';
+import 'package:thruwire/src/palette.dart';
 
 Widget wrapWithTheme(Widget child) {
   return MaterialApp(

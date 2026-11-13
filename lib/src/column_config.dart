@@ -69,11 +69,11 @@ class LogColumnConfig {
   );
 }
 
-const _kColTimeKey = 'wcat.col_time';
-const _kColPidTidKey = 'wcat.col_pid_tid';
-const _kColLevelKey = 'wcat.col_level';
-const _kColTagKey = 'wcat.col_tag';
-const _kColPackageKey = 'wcat.col_package';
+const _kColTimeKey = 'ThruWire.col_time';
+const _kColPidTidKey = 'ThruWire.col_pid_tid';
+const _kColLevelKey = 'ThruWire.col_level';
+const _kColTagKey = 'ThruWire.col_tag';
+const _kColPackageKey = 'ThruWire.col_package';
 
 Future<LogColumnConfig> loadColumnConfig() async {
   try {

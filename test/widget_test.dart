@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:wcat/main.dart';
+import 'package:thruwire/main.dart';
 
 void main() {
   test('LogEntry.fromJson parses a server payload', () {

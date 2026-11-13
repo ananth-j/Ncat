@@ -1,8 +1,8 @@
-# Wcat Communication Protocol Specification
+# ThruWire Communication Protocol Specification
 
 **Current Protocol Version**: `1`
 
-The Wcat protocol defines the communication contract between the Flutter UI client and the Dart Bridge Server.
+The ThruWire protocol defines the communication contract between the Flutter UI client and the Dart Bridge Server.
 
 ---
 
@@ -49,7 +49,7 @@ Clients may transmit a `hello` handshake command to negotiate capabilities:
 {
   "cmd": "hello",
   "protocolVersion": 1,
-  "client": "wcat-flutter-v1"
+  "client": "ThruWire-flutter-v1"
 }
 ```
 
@@ -241,4 +241,4 @@ Starts native hardware recording.
 ```
 
 ### `POST /api/record/stop?serial=<serial>`
-Stops recording via SIGINT, pulls the video file, cleans up on-device storage, and returns raw MP4 bytes with `Content-Type: video/mp4` and `Content-Disposition: attachment; filename="wcat_<serial>_<timestamp>.mp4"`.
+Stops recording via SIGINT, pulls the video file, cleans up on-device storage, and returns raw MP4 bytes with `Content-Type: video/mp4` and `Content-Disposition: attachment; filename="ThruWire_<serial>_<timestamp>.mp4"`.

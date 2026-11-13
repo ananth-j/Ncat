@@ -1,11 +1,11 @@
 {
-    "name": "logoi",
-    "short_name": "logoi",
+    "name": "ThruWire",
+    "short_name": "ThruWire",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "ThruWire: Fast, lightweight Android logcat & device companion.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

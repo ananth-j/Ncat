@@ -19,7 +19,7 @@ class ScreenMirrorView extends StatefulWidget {
 }
 
 class _ScreenMirrorViewState extends State<ScreenMirrorView> {
-  static const _embedChannel = MethodChannel('wcat/scrcpy_embed');
+  static const _embedChannel = MethodChannel('ThruWire/scrcpy_embed');
   final GlobalKey _canvasKey = GlobalKey();
   Timer? _embedTimer;
   bool _syncingEmbedBounds = false;
@@ -45,7 +45,7 @@ class _ScreenMirrorViewState extends State<ScreenMirrorView> {
     _syncingEmbedBounds = true;
     try {
       await _embedChannel.invokeMethod<bool>('attach', {
-        'title': 'wcat mirror - $serial',
+        'title': 'ThruWire mirror - $serial',
         'x': (origin.dx * dpr).round(),
         'y': (origin.dy * dpr).round(),
         'width': (box.size.width * dpr).round(),

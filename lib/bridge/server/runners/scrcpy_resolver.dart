@@ -5,21 +5,21 @@ import 'dart:io';
 class ScrcpyResolver {
   static const String version = 'v5.0.1';
 
-  /// Resolves the local tools directory for wcat dependencies.
+  /// Resolves the local tools directory for ThruWire dependencies.
   static Directory getLocalScrcpyDir() {
     String basePath;
     if (Platform.isWindows) {
       final localApp = Platform.environment['LOCALAPPDATA'];
       basePath =
           localApp != null && localApp.isNotEmpty
-              ? '$localApp\\wcat\\tools\\scrcpy'
-              : '${Platform.environment['USERPROFILE'] ?? '.'}\\.wcat\\tools\\scrcpy';
+              ? '$localApp\\ThruWire\\tools\\scrcpy'
+              : '${Platform.environment['USERPROFILE'] ?? '.'}\\.ThruWire\\tools\\scrcpy';
     } else if (Platform.isMacOS) {
       final home = Platform.environment['HOME'] ?? '.';
-      basePath = '$home/Library/Application Support/wcat/tools/scrcpy';
+      basePath = '$home/Library/Application Support/ThruWire/tools/scrcpy';
     } else {
       final home = Platform.environment['HOME'] ?? '.';
-      basePath = '$home/.local/share/wcat/tools/scrcpy';
+      basePath = '$home/.local/share/ThruWire/tools/scrcpy';
     }
     return Directory(basePath);
   }
@@ -34,7 +34,7 @@ class ScrcpyResolver {
   installerOverride;
 
   /// Locates the scrcpy binary on the host system.
-  /// Checks SCRCPY env var, Wcat local tools directory, system PATH,
+  /// Checks SCRCPY env var, ThruWire local tools directory, system PATH,
   /// and common package manager locations (WinGet, Scoop, Homebrew, etc.).
   static String? findScrcpyExecutable() {
     if (executableOverride != null) return executableOverride;
@@ -45,7 +45,7 @@ class ScrcpyResolver {
       return env;
     }
 
-    // 2. Local Wcat tools directory
+    // 2. Local ThruWire tools directory
     final localDir = getLocalScrcpyDir();
     if (localDir.existsSync()) {
       final binaryName = Platform.isWindows ? 'scrcpy.exe' : 'scrcpy';

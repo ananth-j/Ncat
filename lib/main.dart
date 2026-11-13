@@ -60,7 +60,7 @@ class _LogcatAppState extends State<LogcatApp> {
             : kDarkModernPalette;
 
     return MaterialApp(
-      title: 'wcat',
+      title: 'ThruWire',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(Brightness.light, kLightPalette),
       darkTheme: buildAppTheme(Brightness.dark, darkPalette),

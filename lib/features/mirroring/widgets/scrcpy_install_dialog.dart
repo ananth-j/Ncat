@@ -259,7 +259,7 @@ class _ScrcpyInstallDialogState extends State<ScrcpyInstallDialog> {
               // Download notes
               if (!_isInstalling && _errorMessage == null)
                 Text(
-                  'Wcat will download the official standalone release (~11 MB) from GitHub and extract it into your local app data folder. No system PATH changes or admin privileges required.',
+                  'ThruWire will download the official standalone release (~11 MB) from GitHub and extract it into your local app data folder. No system PATH changes or admin privileges required.',
                   style: TextStyle(
                     fontSize: 10.5,
                     color: palette.dim,

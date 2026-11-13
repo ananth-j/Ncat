@@ -2,9 +2,9 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wcat/features/mirroring/mirror_controller.dart';
-import 'package:wcat/features/mirroring/services/capture_client.dart';
-import 'package:wcat/features/mirroring/widgets/scrcpy_install_dialog.dart';
+import 'package:thruwire/features/mirroring/mirror_controller.dart';
+import 'package:thruwire/features/mirroring/services/capture_client.dart';
+import 'package:thruwire/features/mirroring/widgets/scrcpy_install_dialog.dart';
 
 class _FakeClient implements CaptureClient {
   Map<String, dynamic>? mockPostJsonResult;

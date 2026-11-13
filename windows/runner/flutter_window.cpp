@@ -32,7 +32,7 @@ bool FlutterWindow::OnCreate() {
 
   scrcpy_channel_ = std::make_unique<
       flutter::MethodChannel<flutter::EncodableValue>>(
-      flutter_controller_->engine()->messenger(), "wcat/scrcpy_embed",
+      flutter_controller_->engine()->messenger(), "ThruWire/scrcpy_embed",
       &flutter::StandardMethodCodec::GetInstance());
   scrcpy_channel_->SetMethodCallHandler(
       [this](const auto& call, auto result) {

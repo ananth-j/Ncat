@@ -1,14 +1,14 @@
 ---
-name: wcat-architecture
+name: ThruWire-architecture
 description: >-
-  Architectural guidelines, layer rules, and design patterns for the wcat open-source
+  Architectural guidelines, layer rules, and design patterns for the ThruWire open-source
   project. Use when refactoring, adding new features (screen mirroring, recording,
   screenshots, multi-screen matrix), or implementing bridge communication.
 ---
 
-# wcat Architecture Guide
+# ThruWire Architecture Guide
 
-`wcat` is a fast, lightweight Android companion and logcat streaming tool built with a **Flutter frontend** and a **Dart bridge server**. This guide defines the architectural standards required to keep the project clean, modular, and maintainable as an open-source tool.
+`ThruWire` is a fast, lightweight Android companion and logcat streaming tool built with a **Flutter frontend** and a **Dart bridge server**. This guide defines the architectural standards required to keep the project clean, modular, and maintainable as an open-source tool.
 
 ---
 
@@ -151,9 +151,9 @@ class DeviceSession {
 
 ### C. Screen Recording Implementation
 - Native Android recording requires no desktop video encoding:
-  1. Bridge triggers `adb -s <serial> shell screenrecord --bit-rate 4000000 /sdcard/wcat_temp.mp4`.
-  2. When recording is stopped, bridge runs `adb -s <serial> pull /sdcard/wcat_temp.mp4 <local_path>`.
-  3. Bridge cleans up on device: `adb -s <serial> shell rm /sdcard/wcat_temp.mp4`.
+  1. Bridge triggers `adb -s <serial> shell screenrecord --bit-rate 4000000 /sdcard/ThruWire_temp.mp4`.
+  2. When recording is stopped, bridge runs `adb -s <serial> pull /sdcard/ThruWire_temp.mp4 <local_path>`.
+  3. Bridge cleans up on device: `adb -s <serial> shell rm /sdcard/ThruWire_temp.mp4`.
 
 ### D. Live Mirroring
 - **Phase 2**: Stream MJPEG frames over an HTTP stream (`GET /api/stream?serial=<serial>`).

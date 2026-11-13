@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wcat/bridge/server/runners/scrcpy_resolver.dart';
+import 'package:thruwire/bridge/server/runners/scrcpy_resolver.dart';
 
 void main() {
   group('ScrcpyResolver Unit Tests', () {

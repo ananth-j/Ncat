@@ -16,7 +16,7 @@ class MirrorController {
            bridgeHost ?? (Uri.base.host.isEmpty ? '127.0.0.1' : Uri.base.host),
        _bridgePort = bridgePort;
 
-  static const _embedChannel = MethodChannel('wcat/scrcpy_embed');
+  static const _embedChannel = MethodChannel('ThruWire/scrcpy_embed');
 
   final CaptureClient _client;
   final String _bridgeHost;
@@ -110,7 +110,7 @@ class MirrorController {
   Future<void> _detachEmbeddedWindow() async {
     try {
       await _embedChannel.invokeMethod<void>('detach', {
-        'title': 'wcat mirror - $activeSerial',
+        'title': 'ThruWire mirror - $activeSerial',
       });
     } on MissingPluginException {
       // Only the Windows desktop runner embeds the native scrcpy window.

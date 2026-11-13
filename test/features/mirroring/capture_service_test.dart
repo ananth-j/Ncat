@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wcat/features/mirroring/capture_service.dart';
-import 'package:wcat/features/mirroring/services/capture_client.dart';
+import 'package:thruwire/features/mirroring/capture_service.dart';
+import 'package:thruwire/features/mirroring/services/capture_client.dart';
 
 class MockCaptureClient implements CaptureClient {
   Uri? lastScreenshotUri;

@@ -3,10 +3,10 @@ library;
 
 import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wcat/core/constants.dart';
-import 'package:wcat/features/logcat/logcat_controller.dart';
-import 'package:wcat/features/logcat/models/log_entry.dart';
-import 'package:wcat/protocol/messages.dart';
+import 'package:thruwire/core/constants.dart';
+import 'package:thruwire/features/logcat/logcat_controller.dart';
+import 'package:thruwire/features/logcat/models/log_entry.dart';
+import 'package:thruwire/protocol/messages.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

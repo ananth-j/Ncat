@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wcat/protocol/commands.dart';
-import 'package:wcat/protocol/messages.dart';
+import 'package:thruwire/protocol/commands.dart';
+import 'package:thruwire/protocol/messages.dart';
 
 void main() {
   group('BridgeMessage protocol decoding', () {

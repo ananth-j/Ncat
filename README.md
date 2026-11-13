@@ -1,14 +1,14 @@
-# wcat 🐱
+# ThruWire 🐱
 
-[![CI](https://github.com/ananth-j/wcat/actions/workflows/ci.yml/badge.svg)](https://github.com/ananth-j/wcat/actions)
+[![CI](https://github.com/ananth-j/ThruWire/actions/workflows/ci.yml/badge.svg)](https://github.com/ananth-j/ThruWire/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.24%2B-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5%2B-0175C2?logo=dart)](https://dart.dev)
 
-A modern, performance-first Android companion and `adb logcat` desktop/web viewer. Built with Flutter and a lightweight Dart bridge server. No Android Studio or heavy IDE required — just `adb`, your device, and `wcat`.
+A modern, performance-first Android companion and `adb logcat` desktop/web viewer. Built with Flutter and a lightweight Dart bridge server. No Android Studio or heavy IDE required — just `adb`, your device, and `ThruWire`.
 
 ```text
-Android device(s) ───adb───▶ wcat bridge (127.0.0.1:8080) ───WebSocket/HTTP───▶ Flutter UI
+Android device(s) ───adb───▶ ThruWire bridge (127.0.0.1:8080) ───WebSocket/HTTP───▶ Flutter UI
 ```
 
 ---
@@ -28,7 +28,7 @@ Android device(s) ───adb───▶ wcat bridge (127.0.0.1:8080) ──�
 
 ## 🚀 Performance Benchmarks
 
-| Metric | Target | Wcat Measured |
+| Metric | Target | ThruWire Measured |
 |---|---|---|
 | **Idle CPU (Bridge + App)** | < 2% | **~0.4%** |
 | **Mirroring CPU (15 FPS)** | < 5% | **~3.2%** |
@@ -47,14 +47,14 @@ Android device(s) ───adb───▶ wcat bridge (127.0.0.1:8080) ──�
 4. *(Optional)* **`scrcpy`** installed on your system `PATH` for external hardware-accelerated mirror fallback.
 
 > [!NOTE]
-> **Distribution & Licensing Notice**: Wcat does not bundle Google's Android SDK platform-tools (`adb`) or `scrcpy` binaries due to Google SDK licensing terms. Wcat discovers your existing local tools automatically.
+> **Distribution & Licensing Notice**: ThruWire does not bundle Google's Android SDK platform-tools (`adb`) or `scrcpy` binaries due to Google SDK licensing terms. ThruWire discovers your existing local tools automatically.
 
 ---
 
 ## 🛠️ Quickstart
 
 ### Option A: Desktop (Windows, macOS, Linux)
-On desktop platforms, Wcat automatically launches the embedded bridge server in the background:
+On desktop platforms, ThruWire automatically launches the embedded bridge server in the background:
 
 ```bash
 flutter pub get
@@ -82,7 +82,7 @@ When running via Chrome or hosting as a web companion:
 
 ## 🔒 Security & Authentication
 
-By default, Wcat binds strictly to `127.0.0.1` and verifies the `Origin` header.
+By default, ThruWire binds strictly to `127.0.0.1` and verifies the `Origin` header.
 
 For shared or multi-user workstations, enable session token authentication:
 ```bash
@@ -120,7 +120,7 @@ test/                          # Comprehensive unit & integration test suite (82
 
 ## 🧪 Testing & Code Quality
 
-Wcat maintains a 100% test pass rate with zero analyzer warnings:
+ThruWire maintains a 100% test pass rate with zero analyzer warnings:
 
 ```bash
 # Run unit & integration tests

@@ -1,6 +1,6 @@
-# Contributing to Wcat
+# Contributing to ThruWire
 
-Thank you for your interest in contributing to Wcat! We welcome bug reports, feature requests, documentation improvements, and pull requests.
+Thank you for your interest in contributing to ThruWire! We welcome bug reports, feature requests, documentation improvements, and pull requests.
 
 ---
 
@@ -12,7 +12,7 @@ All contributors and participants are expected to adhere to our [Code of Conduct
 
 ## 2. Prerequisites & Setup
 
-To build and contribute to Wcat, you need:
+To build and contribute to ThruWire, you need:
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.7 or higher, 3.24+ recommended)
 - [Dart SDK](https://dart.dev/get-started) (included with Flutter)
 - Android platform-tools (`adb`) installed on your `PATH` or configured via `ANDROID_HOME` or `ADB`.
@@ -20,8 +20,8 @@ To build and contribute to Wcat, you need:
 
 ### Clone and initialize:
 ```bash
-git clone https://github.com/ananth-j/wcat.git
-cd wcat
+git clone https://github.com/ananth-j/ThruWire.git
+cd ThruWire
 flutter pub get
 ```
 

@@ -562,7 +562,7 @@ class DeviceSession {
       return {
         'status': 'not_installed',
         'message':
-            'scrcpy is not installed on this system. You can install it automatically in Wcat.',
+            'scrcpy is not installed on this system. You can install it automatically in ThruWire.',
       };
     }
 
@@ -571,7 +571,7 @@ class DeviceSession {
         '-s',
         serial,
         '--window-title',
-        'wcat mirror - $serial',
+        'ThruWire mirror - $serial',
       ]);
       _scrcpyProcess = p;
       unawaited(

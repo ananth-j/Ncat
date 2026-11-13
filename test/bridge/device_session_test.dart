@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wcat/bridge/server/device_session.dart';
-import 'package:wcat/bridge/server/runners/process_runner.dart';
+import 'package:thruwire/bridge/server/device_session.dart';
+import 'package:thruwire/bridge/server/runners/process_runner.dart';
 
 void main() {
   group('DeviceSession Manager (T.7)', () {

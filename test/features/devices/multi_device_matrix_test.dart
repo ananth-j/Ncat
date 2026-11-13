@@ -2,15 +2,15 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wcat/features/devices/models/device_info.dart';
-import 'package:wcat/features/devices/widgets/device_tab_bar.dart';
-import 'package:wcat/features/logcat/logcat_controller.dart';
-import 'package:wcat/features/logcat/models/log_entry.dart';
-import 'package:wcat/features/mirroring/capture_service.dart';
-import 'package:wcat/features/mirroring/services/capture_client.dart';
-import 'package:wcat/features/mirroring/widgets/multi_screen_grid.dart';
-import 'package:wcat/protocol/messages.dart';
-import 'package:wcat/src/palette.dart';
+import 'package:thruwire/features/devices/models/device_info.dart';
+import 'package:thruwire/features/devices/widgets/device_tab_bar.dart';
+import 'package:thruwire/features/logcat/logcat_controller.dart';
+import 'package:thruwire/features/logcat/models/log_entry.dart';
+import 'package:thruwire/features/mirroring/capture_service.dart';
+import 'package:thruwire/features/mirroring/services/capture_client.dart';
+import 'package:thruwire/features/mirroring/widgets/multi_screen_grid.dart';
+import 'package:thruwire/protocol/messages.dart';
+import 'package:thruwire/src/palette.dart';
 
 class MockMatrixCaptureClient implements CaptureClient {
   final List<String> capturedSerials = [];

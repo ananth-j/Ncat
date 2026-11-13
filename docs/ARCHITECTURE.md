@@ -1,6 +1,6 @@
-# Wcat Architecture Specification
+# ThruWire Architecture Specification
 
-`wcat` is a high-performance, low-overhead Android companion tool designed for streaming and filtering `adb logcat`, capturing screenshots, mirroring screens with scrcpy, and recording device video across multiple devices.
+`ThruWire` is a high-performance, low-overhead Android companion tool designed for streaming and filtering `adb logcat`, capturing screenshots, mirroring screens with scrcpy, and recording device video across multiple devices.
 
 ---
 
@@ -45,7 +45,7 @@
 ## 2. Core Architectural Principles
 
 ### 2.1 The "Dumb Pipe" Host Principle
-Video transcoding on the host CPU is computationally expensive. Wcat treats the Dart bridge as a **dumb pipe**:
+Video transcoding on the host CPU is computationally expensive. ThruWire treats the Dart bridge as a **dumb pipe**:
 - The bridge never runs ffmpeg, OpenCV, or software video re-encoding on the host.
 - Video recording uses the device's native hardware encoder (`screenrecord`). The bridge sends `SIGINT` (`pkill -2 screenrecord`) on the device, waits for MP4 container finalization, and pulls the completed MP4.
 - Live mirroring uses scrcpy's device-side H.264 encoding and native client decoder. On Windows, the native scrcpy window is hosted inside the mirror pane; other desktop platforms open scrcpy in its own window.

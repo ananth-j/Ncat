@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wcat/bridge/server/bridge_server.dart';
-import 'package:wcat/bridge/server/runners/adb_tracker.dart';
-import 'package:wcat/bridge/server/runners/process_runner.dart';
+import 'package:thruwire/bridge/server/bridge_server.dart';
+import 'package:thruwire/bridge/server/runners/adb_tracker.dart';
+import 'package:thruwire/bridge/server/runners/process_runner.dart';
 
 void main() {
   group('Bridge Process & Tracker Tests (T.6)', () {

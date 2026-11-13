@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wcat/protocol/commands.dart';
-import 'package:wcat/protocol/messages.dart';
+import 'package:thruwire/protocol/commands.dart';
+import 'package:thruwire/protocol/messages.dart';
 
 void main() {
   group('Protocol Versioning & Multiplexing (T.8)', () {
@@ -73,14 +73,14 @@ void main() {
     test('HelloCommand serializes protocolVersion and clientInfo', () {
       const hello = HelloCommand(
         protocolVersion: 1,
-        clientInfo: 'wcat-web-client',
+        clientInfo: 'ThruWire-web-client',
         serial: 'device-xyz',
       );
 
       final json = hello.toJson();
       expect(json['cmd'], 'hello');
       expect(json['protocolVersion'], 1);
-      expect(json['client'], 'wcat-web-client');
+      expect(json['client'], 'ThruWire-web-client');
       expect(json['serial'], 'device-xyz');
     });
 

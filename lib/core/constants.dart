@@ -1,4 +1,4 @@
-/// Application-wide constants for wcat.
+/// Application-wide constants for ThruWire.
 library;
 
 /// Maximum number of lines kept in memory buffer to prevent unbounded growth.
