@@ -1,3 +1,2 @@
-export 'export_stub.dart'
-    if (dart.library.io) 'export_io.dart'
-    if (dart.library.js_interop) 'export_web.dart';
+// Re-export canonical exporter utilities for backward compatibility
+export '../core/utils/export.dart';

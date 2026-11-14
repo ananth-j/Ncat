@@ -12,33 +12,31 @@ import '../../src/bridge_manager.dart';
 import '../../src/column_config.dart';
 import '../../src/export.dart';
 import '../../src/filter_preset.dart';
+import '../devices/device_controller.dart';
 import '../devices/models/device_info.dart';
 import 'models/log_entry.dart';
 
-/// View display modes for multi-device workflows.
-enum DeviceViewMode { singleOrTabs, grid }
-
-/// Isolated log buffer and filter state for a single connected device.
-class DeviceTabState {
-  DeviceTabState({required this.serial});
-
-  final String serial;
-  final List<LogEntry> lines = [];
-  List<LogEntry> visible = [];
-  String search = '';
-  String minLevel = 'V';
-  String packageFilter = '';
-  bool useRegex = false;
-  bool autoScroll = true;
-  bool paused = false;
-  int? appPid;
-}
+// Re-export device domain models for backward compatibility
+export '../devices/device_controller.dart'
+    show DeviceViewMode, DeviceTabState, DeviceController;
 
 /// Central state controller for logcat streaming, filtering, presets, and export.
 class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
-  LogcatController({int maxLines = kMaxLines}) : _maxLines = maxLines;
+  LogcatController({
+    int maxLines = kMaxLines,
+    DeviceController? deviceController,
+  })  : _maxLines = maxLines,
+        _deviceController = deviceController ?? DeviceController() {
+    _deviceController.addListener(_onDeviceChanged);
+  }
 
   final int _maxLines;
+  final DeviceController _deviceController;
+
+  void _onDeviceChanged() {
+    notifyListeners();
+  }
+
   final List<LogEntry> _lines = [];
   List<LogEntry> _visible = const [];
 
@@ -54,16 +52,8 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   String _serverStatus = '';
   int? _appPid;
 
-  List<DeviceInfo> _devices = const [];
-  String? _activeDevice;
-  String? _pickedDevice;
-
-  DeviceViewMode _viewMode = DeviceViewMode.singleOrTabs;
-  final Map<String, DeviceTabState> _tabStates = {};
-
-  DeviceTabState _getOrCreateTab(String serial) {
-    return _tabStates.putIfAbsent(serial, () => DeviceTabState(serial: serial));
-  }
+  DeviceTabState _getOrCreateTab(String serial) =>
+      _deviceController.getOrCreateTab(serial);
 
   List<FilterPreset> _presets = const [];
 
@@ -94,11 +84,12 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   String get connection => _connection;
   String get serverStatus => _serverStatus;
   int? get appPid => _appPid;
-  List<DeviceInfo> get devices => _devices;
-  String? get activeDevice => _activeDevice;
-  String? get pickedDevice => _pickedDevice;
-  DeviceViewMode get viewMode => _viewMode;
-  Map<String, DeviceTabState> get tabStates => Map.unmodifiable(_tabStates);
+  List<DeviceInfo> get devices => _deviceController.devices;
+  String? get activeDevice => _deviceController.activeDevice;
+  String? get pickedDevice => _deviceController.pickedDevice;
+  DeviceViewMode get viewMode => _deviceController.viewMode;
+  Map<String, DeviceTabState> get tabStates => _deviceController.tabStates;
+  DeviceController get deviceController => _deviceController;
   List<FilterPreset> get presets => _presets;
   String get search => _search;
   String get minLevel => _minLevel;
@@ -234,14 +225,14 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   void handleMessage(BridgeMessage message) {
     switch (message) {
       case HistoryMessage(:final lines, :final serial):
-        final targetSerial = serial ?? _activeDevice;
+        final targetSerial = serial ?? activeDevice;
         if (targetSerial != null) {
           final tab = _getOrCreateTab(targetSerial);
           tab.lines
             ..clear()
             ..addAll(lines);
         }
-        if (targetSerial == null || targetSerial == _activeDevice) {
+        if (targetSerial == null || targetSerial == activeDevice) {
           _lines
             ..clear()
             ..addAll(lines);
@@ -254,7 +245,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
       case LogBatchMessage(:final lines, :final serial):
         if (_paused) return;
-        final targetSerial = serial ?? _activeDevice;
+        final targetSerial = serial ?? activeDevice;
         if (targetSerial != null) {
           final tab = _getOrCreateTab(targetSerial);
           tab.lines.addAll(lines);
@@ -266,8 +257,8 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
         // If batch is targeted to a background tab, buffer it without rebuilding UI
         if (targetSerial != null &&
-            _activeDevice != null &&
-            targetSerial != _activeDevice) {
+            activeDevice != null &&
+            targetSerial != activeDevice) {
           return;
         }
 
@@ -322,11 +313,11 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
         break;
 
       case ClearMessage(:final serial):
-        final targetSerial = serial ?? _activeDevice;
+        final targetSerial = serial ?? activeDevice;
         if (targetSerial != null) {
-          _tabStates[targetSerial]?.lines.clear();
+          _deviceController.tabStates[targetSerial]?.lines.clear();
         }
-        if (targetSerial == null || targetSerial == _activeDevice) {
+        if (targetSerial == null || targetSerial == activeDevice) {
           _lines.clear();
           _recompute();
         }
@@ -340,15 +331,10 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       ):
         _serverStatus = status;
         _appPid = pid;
-        _devices = devices;
-        if (_activeDevice == null ||
-            !_devices.any((d) => d.serial == _activeDevice)) {
-          _activeDevice =
-              activeDevice ??
-              (_devices.isNotEmpty ? _devices.first.serial : null);
-        }
-        final activeSerials = _devices.map((d) => d.serial).toSet();
-        _tabStates.removeWhere((k, _) => !activeSerials.contains(k));
+        _deviceController.updateDevices(
+          devices,
+          serverActiveDevice: activeDevice,
+        );
         notifyListeners();
         break;
 
@@ -361,11 +347,12 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void selectDeviceTab(String serial) {
-    if (_activeDevice == serial) return;
+    if (activeDevice == serial) return;
 
     // 1. Save current active tab filter state
-    if (_activeDevice != null) {
-      final currentTab = _getOrCreateTab(_activeDevice!);
+    final current = activeDevice;
+    if (current != null) {
+      final currentTab = _getOrCreateTab(current);
       currentTab.search = _search;
       currentTab.minLevel = _minLevel;
       currentTab.packageFilter = pkgController.text.trim();
@@ -375,8 +362,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     // 2. Switch to target device tab
-    _activeDevice = serial;
-    _pickedDevice = serial;
+    _deviceController.setActiveDevice(serial);
     final tab = _getOrCreateTab(serial);
 
     _search = tab.search;
@@ -398,17 +384,11 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void setViewMode(DeviceViewMode mode) {
-    if (_viewMode == mode) return;
-    _viewMode = mode;
-    notifyListeners();
+    _deviceController.setViewMode(mode);
   }
 
   void toggleViewMode() {
-    _viewMode =
-        _viewMode == DeviceViewMode.singleOrTabs
-            ? DeviceViewMode.grid
-            : DeviceViewMode.singleOrTabs;
-    notifyListeners();
+    _deviceController.toggleViewMode();
   }
 
   void _updateFilterCache() {
@@ -504,8 +484,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void applyDevice(String? serial) {
-    _pickedDevice = serial;
-    notifyListeners();
+    _deviceController.applyDevice(serial);
     sendCommand(DeviceCommand(serial));
   }
 
@@ -603,6 +582,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _deviceController.removeListener(_onDeviceChanged);
     try {
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}
