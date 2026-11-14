@@ -70,16 +70,16 @@
 
 ---
 
-## 🔲 Phase 5 — Documentation Polish
+## ✅ Phase 5 — Documentation Polish (DONE)
 
-- [ ] **README.md**
-  - [ ] Replace placeholder CI badge URLs with real repo URLs
-  - [ ] Add a screenshot or animated GIF of the UI
-  - [ ] Add a "Download" / "Releases" section linking to GitHub Releases
-  - [ ] Update "Contributing" link to point to the new repo
-- [ ] **CHANGELOG.md** — Add `v1.0.0` entry with launch date and feature summary
-- [ ] **docs/PROTOCOL.md** — Verify all endpoint URLs and examples are accurate
-- [ ] **docs/ARCHITECTURE.md** — Verify diagrams and layer descriptions are current
+- [x] **README.md**
+  - [x] Replace placeholder CI badge URLs with real repo URLs
+  - [x] Add a screenshot or animated GIF of the UI (`docs/screenshots/thruwire_ui_preview.png` & `.svg`)
+  - [x] Add a "Download" / "Releases" section linking to GitHub Releases
+  - [x] Update "Contributing" link to point to the new repo
+- [x] **CHANGELOG.md** — Add `v1.0.0` entry with launch date and feature summary
+- [x] **docs/PROTOCOL.md** — Verify all endpoint URLs and examples are accurate
+- [x] **docs/ARCHITECTURE.md** — Verify diagrams and layer descriptions are current
 
 ---
 

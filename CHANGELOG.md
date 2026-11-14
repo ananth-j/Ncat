@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - 2026-10-18
+## [1.0.0] - 2026-11-14
 
 ### Added
 - **Multi-Device Matrix & Per-Device Tabs**:
@@ -21,11 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - POSIX shell escaping and control character sanitization in `sendInputText`.
   - Added comprehensive `SECURITY.md` vulnerability reporting policy and threat model documentation.
 - **Real-Time Screen Mirroring & Low-Latency Input**:
-  - Dedicated HTTP MJPEG stream (`/api/stream`) and WebSocket binary stream (`/stream`).
   - Interactive touch canvas with touch and drag event forwarding mapped from widget coordinates to physical device resolution.
   - Persistent `adb shell` process for sub-millisecond input injection (< 1ms latency).
   - Android soft-key navigation bar (Back, Home, Recents, Volume Up/Down, Power).
   - External hardware-accelerated `scrcpy` fallback button (`POST /api/scrcpy/launch`).
+  - Automated `scrcpy` discovery via `ScrcpyResolver` with single-click downloading and local runtime configuration (`/api/scrcpy/install`).
+  - Windows native window embedding for seamless scrcpy mirror pane integration.
   - Single-frame memory hygiene with immediate `ui.Image.dispose()` preventing RAM drift.
 - **Screenshot & Hardware Screen Recording**:
   - Native lossless PNG capture (`GET /api/screenshot`) with cross-platform download/saving.
@@ -48,3 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-09-01
 - Initial proof of concept logcat viewer with Dart bridge and WebSocket streaming.
+
+[1.0.0]: https://github.com/ananth-j/ThruWire/releases/tag/v1.0.0
+[0.1.0]: https://github.com/ananth-j/ThruWire/releases/tag/v0.1.0

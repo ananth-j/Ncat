@@ -1,0 +1,288 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0f19" />
+      <stop offset="100%" stop-color="#111827" />
+    </linearGradient>
+    <linearGradient id="header-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="active-tab" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <linearGradient id="rec-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#b91c1c" />
+    </linearGradient>
+    <linearGradient id="screen-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e1e2e" />
+      <stop offset="100%" stop-color="#181825" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .mono { font-family: "JetBrains Mono", "Fira Code", Menlo, Monaco, Consolas, monospace; }
+  </style>
+
+  <!-- Background Canvas -->
+  <rect width="1200" height="700" rx="16" fill="url(#bg-grad)" filter="url(#shadow)" stroke="#334155" stroke-width="1.5"/>
+
+  <!-- Window Header Bar -->
+  <rect width="1200" height="42" rx="16" fill="url(#header-grad)"/>
+  <rect y="26" width="1200" height="16" fill="#1e293b"/>
+  <circle cx="24" cy="21" r="6" fill="#ef4444"/>
+  <circle cx="44" cy="21" r="6" fill="#f59e0b"/>
+  <circle cx="64" cy="21" r="6" fill="#10b981"/>
+  <text x="600" y="26" text-anchor="middle" fill="#94a3b8" font-size="13" font-weight="500">ThruWire — Android Logcat &amp; Device Companion (127.0.0.1:8080)</text>
+
+  <!-- Device Tabs Bar -->
+  <rect y="42" width="1200" height="44" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  
+  <!-- Active Tab: Pixel 8 Pro -->
+  <rect x="16" y="48" width="220" height="32" rx="6" fill="url(#active-tab)"/>
+  <circle cx="32" cy="64" r="4" fill="#4ade80"/>
+  <text x="46" y="69" fill="#ffffff" font-size="12" font-weight="600">Pixel 8 Pro</text>
+  <text x="125" y="69" fill="#93c5fd" font-size="11" class="mono">(emulator-5554)</text>
+
+  <!-- Inactive Tab: Galaxy S23 -->
+  <rect x="244" y="48" width="210" height="32" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <circle cx="260" cy="64" r="4" fill="#10b981"/>
+  <text x="274" y="69" fill="#94a3b8" font-size="12">Galaxy S23</text>
+  <text x="350" y="69" fill="#64748b" font-size="11" class="mono">(R5CT100...)</text>
+
+  <!-- Add Device / Grid View -->
+  <rect x="462" y="48" width="100" height="32" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="480" y="69" fill="#94a3b8" font-size="12">⊞ Grid (2x2)</text>
+
+  <!-- Header Right Actions: Connection Badge -->
+  <rect x="1050" y="50" width="134" height="28" rx="14" fill="#064e3b" stroke="#059669" stroke-width="1"/>
+  <circle cx="1066" cy="64" r="4" fill="#34d399"/>
+  <text x="1078" y="68" fill="#34d399" font-size="11" font-weight="600">BRIDGE CONNECTED</text>
+
+  <!-- Filter & Action Toolbar -->
+  <rect y="86" width="1200" height="52" fill="#182234" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- Search / Filter Input -->
+  <rect x="16" y="96" width="310" height="32" rx="6" fill="#0b0f19" stroke="#334155" stroke-width="1"/>
+  <text x="28" y="116" fill="#64748b" font-size="13">🔍</text>
+  <text x="50" y="117" fill="#e2e8f0" font-size="12" class="mono">package:com.example.app</text>
+
+  <!-- Level Filter Chips -->
+  <g transform="translate(338, 96)">
+    <rect x="0" y="0" width="54" height="32" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="27" y="20" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="600">V</text>
+    
+    <rect x="58" y="0" width="54" height="32" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="85" y="20" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="600">D</text>
+
+    <rect x="116" y="0" width="54" height="32" rx="4" fill="#0284c7" />
+    <text x="143" y="20" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="600">I</text>
+
+    <rect x="174" y="0" width="54" height="32" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="201" y="20" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600">W</text>
+
+    <rect x="232" y="0" width="54" height="32" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="259" y="20" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="600">E</text>
+  </g>
+
+  <!-- Controls: Clear, Auto-Scroll -->
+  <rect x="636" y="96" width="68" height="32" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="670" y="117" text-anchor="middle" fill="#cbd5e1" font-size="12">🗑 Clear</text>
+
+  <rect x="712" y="96" width="88" height="32" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="756" y="117" text-anchor="middle" fill="#38bdf8" font-size="12">⬇ Auto-Scroll</text>
+
+  <!-- Media Controls (Right Side) -->
+  <rect x="850" y="96" width="105" height="32" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="902" y="117" text-anchor="middle" fill="#e2e8f0" font-size="12">📸 Screenshot</text>
+
+  <rect x="963" y="96" width="115" height="32" rx="6" fill="url(#rec-grad)"/>
+  <circle cx="977" cy="112" r="4" fill="#ffffff"/>
+  <text x="1025" y="117" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="600">REC 00:24</text>
+
+  <rect x="1086" y="96" width="98" height="32" rx="6" fill="#0284c7"/>
+  <text x="1135" y="117" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="600">⚡ scrcpy</text>
+
+  <!-- Main Body: Split View -->
+  <!-- Left Side: Virtualized Log Table (width: 780) -->
+  <rect x="16" y="146" width="790" height="518" rx="8" fill="#0b0f19" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- Table Header -->
+  <rect x="16" y="146" width="790" height="32" rx="8" fill="#1e293b"/>
+  <text x="32" y="167" fill="#94a3b8" font-size="11" font-weight="600" class="mono">TIME</text>
+  <text x="150" y="167" fill="#94a3b8" font-size="11" font-weight="600" class="mono">LVL</text>
+  <text x="190" y="167" fill="#94a3b8" font-size="11" font-weight="600" class="mono">PID</text>
+  <text x="250" y="167" fill="#94a3b8" font-size="11" font-weight="600" class="mono">TAG</text>
+  <text x="400" y="167" fill="#94a3b8" font-size="11" font-weight="600" class="mono">MESSAGE</text>
+
+  <!-- Log Rows -->
+  <!-- Row 1: Info -->
+  <g transform="translate(16, 178)">
+    <rect x="0" y="0" width="790" height="32" fill="#0b0f19"/>
+    <text x="16" y="21" fill="#64748b" font-size="11" class="mono">11-14 22:42:01.104</text>
+    <rect x="134" y="6" width="18" height="18" rx="3" fill="#0284c7"/>
+    <text x="143" y="20" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="bold" class="mono">I</text>
+    <text x="174" y="21" fill="#64748b" font-size="11" class="mono">14205</text>
+    <text x="234" y="21" fill="#38bdf8" font-size="11" font-weight="600" class="mono">ActivityTaskManager</text>
+    <text x="384" y="21" fill="#cbd5e1" font-size="11" class="mono">START u0 {act=android.intent.action.MAIN cmp=com.example.app/.MainActivity}</text>
+  </g>
+
+  <!-- Row 2: Debug -->
+  <g transform="translate(16, 210)">
+    <rect x="0" y="0" width="790" height="32" fill="#0f172a"/>
+    <text x="16" y="21" fill="#64748b" font-size="11" class="mono">11-14 22:42:01.320</text>
+    <rect x="134" y="6" width="18" height="18" rx="3" fill="#1e3a8a"/>
+    <text x="143" y="20" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="bold" class="mono">D</text>
+    <text x="174" y="21" fill="#64748b" font-size="11" class="mono">14205</text>
+    <text x="234" y="21" fill="#818cf8" font-size="11" font-weight="600" class="mono">FlutterEngine</text>
+    <text x="384" y="21" fill="#cbd5e1" font-size="11" class="mono">Surface created with dimension 1080x2400 (Vsync 120Hz)</text>
+  </g>
+
+  <!-- Row 3: Info (Selected / Highlighted) -->
+  <g transform="translate(16, 242)">
+    <rect x="0" y="0" width="790" height="32" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+    <text x="16" y="21" fill="#93c5fd" font-size="11" class="mono">11-14 22:42:01.554</text>
+    <rect x="134" y="6" width="18" height="18" rx="3" fill="#0284c7"/>
+    <text x="143" y="20" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="bold" class="mono">I</text>
+    <text x="174" y="21" fill="#93c5fd" font-size="11" class="mono">14205</text>
+    <text x="234" y="21" fill="#38bdf8" font-size="11" font-weight="600" class="mono">flutter</text>
+    <text x="384" y="21" fill="#ffffff" font-size="11" font-weight="600" class="mono">[HTTP] GET /api/v2/feed?page=1 status=200 in 48ms</text>
+  </g>
+
+  <!-- Row 4: Warn -->
+  <g transform="translate(16, 274)">
+    <rect x="0" y="0" width="790" height="32" fill="#0b0f19"/>
+    <text x="16" y="21" fill="#64748b" font-size="11" class="mono">11-14 22:42:01.890</text>
+    <rect x="134" y="6" width="18" height="18" rx="3" fill="#78350f"/>
+    <text x="143" y="20" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="bold" class="mono">W</text>
+    <text x="174" y="21" fill="#64748b" font-size="11" class="mono">14205</text>
+    <text x="234" y="21" fill="#fbbf24" font-size="11" font-weight="600" class="mono">Glide</text>
+    <text x="384" y="21" fill="#fde68a" font-size="11" class="mono">Image disk cache missed for url: https://cdn.example.com/thumb_01.jpg</text>
+  </g>
+
+  <!-- Row 5: Error -->
+  <g transform="translate(16, 306)">
+    <rect x="0" y="0" width="790" height="32" fill="#450a0a" fill-opacity="0.3"/>
+    <text x="16" y="21" fill="#fca5a5" font-size="11" class="mono">11-14 22:42:02.012</text>
+    <rect x="134" y="6" width="18" height="18" rx="3" fill="#dc2626"/>
+    <text x="143" y="20" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="bold" class="mono">E</text>
+    <text x="174" y="21" fill="#fca5a5" font-size="11" class="mono">14205</text>
+    <text x="234" y="21" fill="#f87171" font-size="11" font-weight="600" class="mono">AndroidRuntime</text>
+    <text x="384" y="21" fill="#fecaca" font-size="11" class="mono">FATAL EXCEPTION: main Process: com.example.app PID: 14205</text>
+  </g>
+
+  <!-- Row 6: Error detail -->
+  <g transform="translate(16, 338)">
+    <rect x="0" y="0" width="790" height="32" fill="#450a0a" fill-opacity="0.2"/>
+    <text x="16" y="21" fill="#fca5a5" font-size="11" class="mono">11-14 22:42:02.013</text>
+    <rect x="134" y="6" width="18" height="18" rx="3" fill="#dc2626"/>
+    <text x="143" y="20" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="bold" class="mono">E</text>
+    <text x="174" y="21" fill="#fca5a5" font-size="11" class="mono">14205</text>
+    <text x="234" y="21" fill="#f87171" font-size="11" font-weight="600" class="mono">AndroidRuntime</text>
+    <text x="384" y="21" fill="#fca5a5" font-size="11" class="mono">  at com.example.app.MainActivity.onPaymentResult(MainActivity.kt:142)</text>
+  </g>
+
+  <!-- Row 7: Info -->
+  <g transform="translate(16, 370)">
+    <rect x="0" y="0" width="790" height="32" fill="#0b0f19"/>
+    <text x="16" y="21" fill="#64748b" font-size="11" class="mono">11-14 22:42:02.450</text>
+    <rect x="134" y="6" width="18" height="18" rx="3" fill="#0284c7"/>
+    <text x="143" y="20" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="bold" class="mono">I</text>
+    <text x="174" y="21" fill="#64748b" font-size="11" class="mono">14205</text>
+    <text x="234" y="21" fill="#38bdf8" font-size="11" font-weight="600" class="mono">WindowManager</text>
+    <text x="384" y="21" fill="#cbd5e1" font-size="11" class="mono">WIN DEATH: Window{7a1b028 u0 com.example.app/MainActivity}</text>
+  </g>
+
+  <!-- Row 8: Verbose -->
+  <g transform="translate(16, 402)">
+    <rect x="0" y="0" width="790" height="32" fill="#0f172a"/>
+    <text x="16" y="21" fill="#64748b" font-size="11" class="mono">11-14 22:42:03.118</text>
+    <rect x="134" y="6" width="18" height="18" rx="3" fill="#334155"/>
+    <text x="143" y="20" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="bold" class="mono">V</text>
+    <text x="174" y="21" fill="#64748b" font-size="11" class="mono">892</text>
+    <text x="234" y="21" fill="#94a3b8" font-size="11" font-weight="600" class="mono">AudioFlinger</text>
+    <text x="384" y="21" fill="#94a3b8" font-size="11" class="mono">AudioStreamOut: release track session 42</text>
+  </g>
+
+  <!-- Row 9: Info -->
+  <g transform="translate(16, 434)">
+    <rect x="0" y="0" width="790" height="32" fill="#0b0f19"/>
+    <text x="16" y="21" fill="#64748b" font-size="11" class="mono">11-14 22:42:03.502</text>
+    <rect x="134" y="6" width="18" height="18" rx="3" fill="#0284c7"/>
+    <text x="143" y="20" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="bold" class="mono">I</text>
+    <text x="174" y="21" fill="#64748b" font-size="11" class="mono">14205</text>
+    <text x="234" y="21" fill="#38bdf8" font-size="11" font-weight="600" class="mono">Zygote</text>
+    <text x="384" y="21" fill="#cbd5e1" font-size="11" class="mono">Process 14205 exited cleanly with return code 0</text>
+  </g>
+
+  <!-- Table Footer Stats -->
+  <rect x="16" y="632" width="790" height="32" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <text x="32" y="652" fill="#64748b" font-size="11" class="mono">Showing 42 / 108,412 lines</text>
+  <text x="450" y="652" fill="#64748b" font-size="11" class="mono">PID: 14205 | Buffer: 100,000 max | Latency: 0.4ms</text>
+
+  <!-- Right Side: Device Screen Mirror Pane (width: 362) -->
+  <rect x="822" y="146" width="362" height="518" rx="8" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- Mirror Pane Header -->
+  <rect x="822" y="146" width="362" height="32" rx="8" fill="#1e293b"/>
+  <text x="836" y="167" fill="#cbd5e1" font-size="12" font-weight="600">📱 Live Screen Mirror (1080×2400)</text>
+  <text x="1140" y="167" fill="#4ade80" font-size="11" font-weight="600">60 FPS</text>
+
+  <!-- Phone Frame Silhouette -->
+  <rect x="878" y="190" width="250" height="420" rx="28" fill="#1e1e2e" stroke="#475569" stroke-width="4"/>
+  
+  <!-- Camera Notch / Dynamic Island -->
+  <rect x="968" y="200" width="70" height="12" rx="6" fill="#0f172a"/>
+  <circle cx="1025" cy="206" r="3" fill="#1e293b"/>
+
+  <!-- Phone Display Screen -->
+  <rect x="888" y="218" width="230" height="350" rx="16" fill="url(#screen-grad)"/>
+
+  <!-- Mobile Mockup App UI inside Screen -->
+  <!-- App Bar -->
+  <rect x="888" y="218" width="230" height="40" fill="#2563eb"/>
+  <text x="904" y="243" fill="#ffffff" font-size="13" font-weight="bold">Feed &amp; Catalog</text>
+  <circle cx="1098" cy="238" r="8" fill="#3b82f6"/>
+  <text x="1098" y="242" text-anchor="middle" fill="#ffffff" font-size="10">🔍</text>
+
+  <!-- Card 1 -->
+  <rect x="900" y="270" width="206" height="64" rx="8" fill="#313244"/>
+  <rect x="910" y="280" width="44" height="44" rx="6" fill="#89b4fa"/>
+  <text x="964" y="295" fill="#cdd6f4" font-size="11" font-weight="600">Wireless Headphones</text>
+  <text x="964" y="312" fill="#a6adc8" font-size="9">Active Noise Cancelling</text>
+
+  <!-- Card 2 -->
+  <rect x="900" y="344" width="206" height="64" rx="8" fill="#313244"/>
+  <rect x="910" y="354" width="44" height="44" rx="6" fill="#a6e3a1"/>
+  <text x="964" y="369" fill="#cdd6f4" font-size="11" font-weight="600">Mechanical Keyboard</text>
+  <text x="964" y="386" fill="#a6adc8" font-size="9">Hot-swappable RGB</text>
+
+  <!-- Floating Action Button -->
+  <circle cx="1080" cy="530" r="18" fill="#2563eb" filter="url(#shadow)"/>
+  <text x="1080" y="536" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="bold">+</text>
+
+  <!-- Touch Cursor Ripple -->
+  <circle cx="980" cy="370" r="16" fill="#60a5fa" fill-opacity="0.3" stroke="#93c5fd" stroke-width="1.5"/>
+  <circle cx="980" cy="370" r="4" fill="#3b82f6"/>
+
+  <!-- Android Soft Navigation Bar -->
+  <rect x="888" y="568" width="230" height="32" rx="8" fill="#11111b"/>
+  <text x="930" y="588" fill="#6c7086" font-size="12">◀</text>
+  <circle cx="1003" cy="584" r="5" fill="#6c7086"/>
+  <rect x="1065" y="579" width="10" height="10" rx="2" fill="#6c7086"/>
+
+  <!-- Touch Interaction Latency Tag -->
+  <rect x="888" y="620" width="230" height="26" rx="4" fill="#1e293b"/>
+  <text x="1003" y="637" text-anchor="middle" fill="#94a3b8" font-size="11">Touch Latency: <tspan fill="#4ade80" font-weight="bold">&lt; 1ms</tspan> (persistent shell)</text>
+
+  <!-- Footer Window Status Bar -->
+  <rect y="670" width="1200" height="30" rx="8" fill="#0b0f19" stroke="#1e293b" stroke-width="1"/>
+  <text x="24" y="689" fill="#64748b" font-size="11">Ready | CPU: 0.4% | Memory: 68 MB | Stream Cap: 1/2 Active</text>
+  <text x="1176" y="689" text-anchor="end" fill="#64748b" font-size="11">ThruWire v1.0.0 (MIT)</text>
+</svg>

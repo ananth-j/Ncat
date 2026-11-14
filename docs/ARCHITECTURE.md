@@ -6,7 +6,46 @@
 
 ## 1. High-Level System Overview
 
+```mermaid
+flowchart TD
+    subgraph Frontend["Flutter Frontend (Desktop: Windows / macOS / Linux | Web: Browser)"]
+        UI["LogTable View & DeviceTabBar"]
+        MC["MirrorController & CaptureService"]
+        LC["LogcatController (Virtualized 60 FPS State)"]
+        CC["CaptureClient (Cross-Platform IO/Web)"]
+    end
+
+    subgraph Bridge["Dart Bridge Server (127.0.0.1:8080)"]
+        WS["WebSocket /ws (Flushed batches / 100ms)"]
+        HTTP["HTTP API (/api/screenshot, /api/record, /api/scrcpy, /api/input)"]
+        DS["DeviceSession (Per-Device Serial Isolation)"]
+        TR["AdbTracker (track-devices Push Stream)"]
+        SR["ScrcpyResolver (Auto Discovery & Bootstrapping)"]
+    end
+
+    subgraph Hardware["Android Device / Emulator"]
+        LOGCAT["adb logcat -v epoch"]
+        SHELL["adb shell (Persistent stdin < 1ms)"]
+        REC["screenrecord (Hardware H.264 + SIGINT)"]
+        CAP["screencap -p (Lossless PNG)"]
+        SC["scrcpy server (Native H.264 decode)"]
+    end
+
+    UI -->|Commands & Filters| WS
+    WS -->|Batched Log Lines| LC
+    MC -->|HTTP Controls| HTTP
+    CC -->|Binary Media| HTTP
+    HTTP --> DS
+    WS --> DS
+    TR -->|Plug/Unplug Events| WS
+    DS --> LOGCAT
+    DS --> SHELL
+    DS --> REC
+    DS --> CAP
+    SR -.->|Launch & Embed| SC
 ```
+
+```text
 ┌────────────────────────────────────────────────────────┐
 │                   Flutter Frontend                     │
 │  (Desktop: Windows / macOS / Linux  |  Web: Browser)   │
@@ -30,6 +69,11 @@
 │  │  - Persistent `adb shell` for < 1ms input        │  │
 │  │  - Native `screenrecord` with SIGINT finalizer   │  │
 │  │  - On-demand single screenshots                  │  │
+│  └──────────────────────────────────────────────────┘  │
+│                                                        │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │       ScrcpyResolver (Auto Bootstrap)            │  │
+│  │  Discovers system scrcpy or auto-downloads       │  │
 │  └──────────────────────────────────────────────────┘  │
 └───────────────────────────▲────────────────────────────┘
                             │
@@ -66,14 +110,15 @@ All device state is encapsulated in `DeviceSession`:
 ## 3. Layer Breakdown
 
 ### 3.1 Presentation Layer (`lib/features/`)
-- **`logcat/`**: Virtualized, high-throughput log viewer (`LogTable`). Built with custom layout renderers to handle 100,000+ lines at 60fps.
-- **`mirroring/`**: Scrcpy session controls and a native window host for the Windows mirror pane.
-- **`devices/`**: Multi-device tab bar (`DeviceTabBar`) and multi-screen grid layout (`MultiScreenGrid`).
+- **`logcat/`**: Virtualized, high-throughput log viewer (`LogTableView`, `LogRow`). Built with custom viewport renderers to handle 100,000+ lines at 60 FPS without memory bloat. Includes `TopFilterBar`, `ColumnConfigDialog`, `PresetsDialog`, and `LeftVerticalToolbar`.
+- **`mirroring/`**: Touch-interactive screen canvas (`ScreenMirrorView`), screenshot preview dialog (`ScreenshotDialog`), and automated scrcpy installation sheet (`ScrcpyInstallDialog`). Embeds native window on Windows via Windows runner MethodChannel.
+- **`devices/`**: Multi-device tab bar (`DeviceTabBar`) and multi-screen grid layout (`MultiScreenGrid`) enforcing the 2-stream concurrency hard cap (`kMaxConcurrentStreams = 2`).
 
 ### 3.2 State & Controller Layer
 - **`LogcatController`**: Manages view state, search queries, severity filters, column configuration, and per-device tab state (`DeviceTabState`). When the app is minimized or hidden, it enters **Background Mode**, buffering logs in memory without rebuilding the UI widget tree.
-- **`MirrorController`**: Starts scrcpy on demand and tracks its pane lifecycle.
+- **`MirrorController`**: Starts scrcpy on demand, forwards touch/key/text inputs to the bridge, and tracks mirror pane lifecycles.
 - **`CaptureService`**: Coordinates single-shot screenshots and hardware video recording with toolbar badge countdowns.
+- **`CaptureClient`**: Cross-platform abstraction (`capture_client_io.dart` and `capture_client_web.dart`) that handles HTTP media streaming and triggers native file download dialogs across desktop file systems and web browsers.
 
 ### 3.3 Bridge Management (`lib/bridge/`)
 - **Conditional Compilation**: Uses Dart conditional imports (`bridge_manager_io.dart` vs `bridge_manager_stub.dart`) so the app compiles seamlessly to native desktop executables and pure Web (WASM/JS).
@@ -83,6 +128,7 @@ All device state is encapsulated in `DeviceSession`:
 ### 3.4 Process & ADB Runner Layer (`lib/bridge/server/runners/`)
 - **`ProcessRunner` Interface**: Abstraction over `dart:io Process` allowing complete unit and integration testing without requiring real hardware or ADB binaries via `FakeProcessRunner`.
 - **`AdbTracker`**: Listens to `adb track-devices` stdout rather than polling `adb devices` on a timer, eliminating idle process fork overhead.
+- **`ScrcpyResolver`**: Detects local `scrcpy` executables across system `PATH`, standard package manager locations (Chocolatey, Scoop, Homebrew), and `%LOCALAPPDATA%\ThruWire\tools\scrcpy`. Provides automatic on-demand archive downloading and unpacking.
 
 ---
 

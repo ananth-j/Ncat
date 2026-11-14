@@ -694,7 +694,7 @@ class LogcatBridgeServer {
     final bytes = await session.stopRecording();
     if (bytes != null) {
       final filename =
-          'wcat_${serial}_${DateTime.now().millisecondsSinceEpoch}.mp4';
+          'thruwire_${serial}_${DateTime.now().millisecondsSinceEpoch}.mp4';
       req.response.headers.contentType = ContentType('video', 'mp4');
       req.response.headers.set(
         'Content-Disposition',

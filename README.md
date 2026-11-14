@@ -1,6 +1,7 @@
 # ThruWire 🐱
 
-[![CI](https://github.com/ananth-j/ThruWire/actions/workflows/ci.yml/badge.svg)](https://github.com/ananth-j/ThruWire/actions)
+[![CI](https://github.com/ananth-j/ThruWire/actions/workflows/ci.yml/badge.svg)](https://github.com/ananth-j/ThruWire/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ananth-j/ThruWire?color=02569B&label=Release)](https://github.com/ananth-j/ThruWire/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.24%2B-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5%2B-0175C2?logo=dart)](https://dart.dev)
@@ -10,6 +11,25 @@ A modern, performance-first Android companion and `adb logcat` desktop/web viewe
 ```text
 Android device(s) ───adb───▶ ThruWire bridge (127.0.0.1:8080) ───WebSocket/HTTP───▶ Flutter UI
 ```
+
+<p align="center">
+  <img src="docs/screenshots/thruwire_ui_preview.png" alt="ThruWire Desktop UI Preview" width="100%" />
+</p>
+
+---
+
+## 📥 Download & Releases
+
+Pre-compiled standalone binaries for the latest release are available on [**GitHub Releases**](https://github.com/ananth-j/ThruWire/releases):
+
+| Platform | Package | Architecture | Description |
+|---|---|---|---|
+| **Windows** | [`thruwire-windows-x64.zip`](https://github.com/ananth-j/ThruWire/releases/latest) | x86_64 | Portable Windows desktop app with embedded bridge & scrcpy window host |
+| **macOS** | [`thruwire-macos.zip`](https://github.com/ananth-j/ThruWire/releases/latest) | Universal (x86_64 / arm64) | macOS application bundle with background bridge manager |
+| **Linux** | [`thruwire-linux-x64.tar.gz`](https://github.com/ananth-j/ThruWire/releases/latest) | x86_64 | Linux GTK release bundle |
+| **Web** | [`thruwire-web.zip`](https://github.com/ananth-j/ThruWire/releases/latest) | Web (WASM / CanvasKit) | Standalone client bundle hostable via `dart run bin/server.dart --web` |
+
+👉 **[Download the Latest Release (v1.0.0)](https://github.com/ananth-j/ThruWire/releases/latest)**
 
 ---
 
@@ -113,7 +133,7 @@ bin/
 docs/
 ├── ARCHITECTURE.md            # Architectural deep-dive & design patterns
 └── PROTOCOL.md                # WebSocket & HTTP API contract specification
-test/                          # Comprehensive unit & integration test suite (82+ tests)
+test/                          # Comprehensive unit & integration test suite (87+ tests)
 ```
 
 ---
@@ -137,7 +157,11 @@ dart format --output=none --set-exit-if-changed .
 
 ## 🤝 Contributing
 
-We welcome community contributions! Please review [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md) before submitting pull requests.
+We welcome community contributions! Please review our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting pull requests.
+
+- **Found a bug?** Submit an issue on the [Issue Tracker](https://github.com/ananth-j/ThruWire/issues).
+- **Want to request a feature?** Start a discussion or open a [Feature Request](https://github.com/ananth-j/ThruWire/issues/new?template=feature_request.md).
+- **Ready to contribute code?** Fork the repository and open a [Pull Request](https://github.com/ananth-j/ThruWire/pulls).
 
 ---
 
