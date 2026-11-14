@@ -162,7 +162,7 @@ class TopFilterBar extends StatelessWidget {
           onChanged: onSearch,
           style: TextStyle(fontSize: 12, color: palette.text),
           decoration: InputDecoration(
-            hintText: 'Filter (tag, message, or text)...',
+            hintText: 'tag:MainActivity level:ERROR message:failed',
             hintStyle: TextStyle(fontSize: 12, color: palette.dim),
             filled: true,
             fillColor: palette.bg,

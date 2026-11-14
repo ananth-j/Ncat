@@ -15,6 +15,7 @@ import '../../src/filter_preset.dart';
 import '../devices/device_controller.dart';
 import '../devices/models/device_info.dart';
 import 'models/log_entry.dart';
+import 'models/log_query.dart';
 
 // Re-export device domain models for backward compatibility
 export '../devices/device_controller.dart'
@@ -70,10 +71,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
   // Filter cache (Phase 2.2)
   int _cachedMinRank = 0;
-  String _cachedQuery = '';
-  String _cachedQueryLower = '';
-  RegExp? _cachedRegex;
-  bool _cachedUseRegex = false;
+  LogQuery _cachedQuery = LogQuery('');
 
   LogColumnConfig _columns = const LogColumnConfig();
 
@@ -401,30 +399,42 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       'F' || 'S' => 5,
       _ => kLevels.indexOf(_minLevel).clamp(0, kLevels.length - 1),
     };
-    _cachedQuery = _search;
-    _cachedQueryLower = _search.toLowerCase();
-    _cachedUseRegex = _useRegex;
-
-    if (_cachedUseRegex && _cachedQuery.isNotEmpty) {
-      try {
-        _cachedRegex = RegExp(_cachedQuery, caseSensitive: false);
-      } catch (_) {
-        _cachedRegex = null;
-      }
-    } else {
-      _cachedRegex = null;
-    }
+    _cachedQuery = LogQuery(_search, useRegex: _useRegex);
   }
 
   bool _matchesFilter(LogEntry e) {
     if (e.rank < _cachedMinRank) return false;
-    if (_cachedQuery.isEmpty) return true;
-    if (_cachedUseRegex) {
-      final re = _cachedRegex;
-      return re != null && (re.hasMatch(e.msg) || re.hasMatch(e.tag));
+    for (final term in _cachedQuery.terms) {
+      final field = term.field;
+      final matched = switch (field) {
+        'tag' => term.matches(e.tag),
+        'message' => term.matches(e.msg),
+        'package' => term.matches(
+          e.pkg ?? (_appPid == e.pid ? pkgController.text.trim() : ''),
+        ),
+        'process' => term.matches(
+          e.pkg ?? (_appPid == e.pid ? pkgController.text.trim() : '${e.pid}'),
+        ),
+        'level' => _matchesLevelTerm(e, term.value, term.negated),
+        _ => term.matches('${e.tag} ${e.msg}'),
+      };
+      if (!matched) return false;
     }
-    return e.msg.toLowerCase().contains(_cachedQueryLower) ||
-        e.tag.toLowerCase().contains(_cachedQueryLower);
+    return true;
+  }
+
+  bool _matchesLevelTerm(LogEntry entry, String value, bool negated) {
+    final rank = switch (value.toUpperCase()) {
+      'V' || 'VERBOSE' => 0,
+      'D' || 'DEBUG' => 1,
+      'I' || 'INFO' => 2,
+      'W' || 'WARN' || 'WARNING' => 3,
+      'E' || 'ERROR' => 4,
+      'F' || 'S' || 'ASSERT' || 'FATAL' => 5,
+      _ => -1,
+    };
+    final matched = rank >= 0 && entry.rank >= rank;
+    return negated ? !matched : matched;
   }
 
   void _recompute() {
