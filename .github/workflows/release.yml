@@ -18,22 +18,22 @@ jobs:
             os: windows-latest
             build_cmd: flutter build windows --release
             artifact_dir: build/windows/x64/runner/Release
-            archive_name: wcat-windows-x64.zip
+            archive_name: thruwire-windows-x64.zip
           - platform: macos
             os: macos-latest
             build_cmd: flutter build macos --release
-            artifact_dir: build/macos/Build/Products/Release/wcat.app
-            archive_name: wcat-macos.zip
+            artifact_dir: build/macos/Build/Products/Release
+            archive_name: thruwire-macos.zip
           - platform: linux
             os: ubuntu-latest
             build_cmd: flutter build linux --release
             artifact_dir: build/linux/x64/release/bundle
-            archive_name: wcat-linux-x64.tar.gz
+            archive_name: thruwire-linux-x64.tar.gz
           - platform: web
             os: ubuntu-latest
             build_cmd: flutter build web --release
             artifact_dir: build/web
-            archive_name: wcat-web.zip
+            archive_name: thruwire-web.zip
 
     steps:
       - name: Checkout repository
@@ -63,7 +63,9 @@ jobs:
 
       - name: Package artifact (macOS)
         if: matrix.platform == 'macos'
-        run: zip -r ${{ matrix.archive_name }} ${{ matrix.artifact_dir }}
+        run: |
+          cd ${{ matrix.artifact_dir }}
+          zip -r ../../../../${{ matrix.archive_name }} *.app
 
       - name: Package artifact (Linux)
         if: matrix.platform == 'linux'
@@ -95,9 +97,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-artifacts/**/*
+          files: release-artifacts/*
           generate_release_notes: true

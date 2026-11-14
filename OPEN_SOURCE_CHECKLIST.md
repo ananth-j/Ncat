@@ -83,23 +83,23 @@
 
 ---
 
-## 🔲 Phase 6 — CI/CD (GitHub Actions)
+## ✅ Phase 6 — CI/CD (GitHub Actions) (DONE)
 
 > [!NOTE]
-> A `.github/workflows/ci.yml` likely already exists. Update it for the renamed project.
+> Workflows updated for `ThruWire` across `.github/workflows/ci.yml` and `.github/workflows/release.yml`.
 
-- [ ] Verify or create `.github/workflows/ci.yml` with jobs:
-  - [ ] `dart format --output=none --set-exit-if-changed .`
-  - [ ] `flutter analyze --fatal-infos`
-  - [ ] `flutter test --coverage`
-  - [ ] Coverage threshold check (e.g. 80%+)
-- [ ] Add **release build jobs** (optional):
-  - [ ] `flutter build windows --release`
-  - [ ] `flutter build linux --release`
-  - [ ] `flutter build macos --release` (requires macOS runner)
-  - [ ] `flutter build web --release`
-- [ ] Add **GitHub Release workflow** triggered on `v*` tag push
-- [ ] (Optional) Set up **Codecov** or **Coveralls** for coverage reporting
+- [x] Verify or create `.github/workflows/ci.yml` with jobs:
+  - [x] `dart format --output=none --set-exit-if-changed .`
+  - [x] `flutter analyze --fatal-infos`
+  - [x] `flutter test --coverage`
+  - [x] Coverage verification & summary step (console & `$GITHUB_STEP_SUMMARY`)
+- [x] Add **release build jobs** (`.github/workflows/release.yml`):
+  - [x] `flutter build windows --release` (`thruwire-windows-x64.zip`)
+  - [x] `flutter build linux --release` (`thruwire-linux-x64.tar.gz`)
+  - [x] `flutter build macos --release` (`thruwire-macos.zip`)
+  - [x] `flutter build web --release` (`thruwire-web.zip`)
+- [x] Add **GitHub Release workflow** triggered on `v*` tag push (`softprops/action-gh-release@v2`)
+- [x] Set up **Codecov** for coverage reporting (`codecov/codecov-action@v4`)
 
 ---
 

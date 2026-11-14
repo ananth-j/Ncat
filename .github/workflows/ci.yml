@@ -33,5 +33,33 @@ jobs:
       - name: Run test suite with coverage
         run: flutter test --coverage
 
-      - name: Check coverage file generated
+      - name: Verify coverage file generated
         run: test -f coverage/lcov.info || (echo "Coverage file not generated" && exit 1)
+
+      - name: Calculate and report test coverage
+        run: |
+          python3 -c "
+          with open('coverage/lcov.info', 'r', encoding='utf-8') as f:
+              lf, lh = 0, 0
+              for line in f:
+                  if line.startswith('LF:'):
+                      lf += int(line.strip().split(':')[1])
+                  elif line.startswith('LH:'):
+                      lh += int(line.strip().split(':')[1])
+              pct = (lh / lf * 100) if lf else 0
+              summary = f'### Test Coverage Report\n- **Lines Found (LF):** {lf}\n- **Lines Hit (LH):** {lh}\n- **Line Coverage:** {pct:.2f}%\n'
+              print(summary)
+              import os
+              summary_file = os.getenv('GITHUB_STEP_SUMMARY')
+              if summary_file:
+                  with open(summary_file, 'a', encoding='utf-8') as sf:
+                      sf.write(summary)
+          "
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        continue-on-error: true
+        with:
+          file: coverage/lcov.info
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
