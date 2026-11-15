@@ -15,30 +15,24 @@
 - [x] `windows/runner/main.cpp` — window title = `ThruWire`
 - [x] `windows/runner/flutter_window.cpp` — method channel = `ThruWire/scrcpy_embed`
 - [x] `windows/runner/Runner.rc` — `ProductName`, `InternalName`, `OriginalFilename` → ThruWire
-- [x] `android/app/src/main/AndroidManifest.xml` — `android:label` = `ThruWire`
-- [x] `ios/Runner/Info.plist` — `CFBundleDisplayName` = `ThruWire`, `CFBundleName` = `ThruWire`
 - [x] `web/index.html` — `<title>` and meta tags = `ThruWire`
 - [x] `web/manifest.json` — `name`, `short_name`, `description` = `ThruWire`
 - [x] `lib/main.dart` — app `title: 'ThruWire'`
 - [x] All markdown docs (`README.md`, `PLAN.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, `docs/ARCHITECTURE.md`, `docs/PROTOCOL.md`) — `wcat`/`Wcat` → `ThruWire`/`ThruWire`
 - [x] `.agents/skills/wcat-architecture/SKILL.md` updated
 - [x] Scrcpy local tools path — `%LOCALAPPDATA%\ThruWire\tools\scrcpy`
+- [x] Mobile platforms stripped — removed unused `android/` and `ios/` folders (Desktop & Web only)
 - [x] `flutter pub get` — regenerated package config ✅
 - [x] `flutter analyze` — **0 issues** ✅
 
 ---
 
-## 🔲 Phase 2 — Android Package ID Rename (Manual)
+## 🔲 Phase 2 — macOS Bundle ID Configuration (Manual)
 
-> [!WARNING]
-> This requires renaming Kotlin source directories and updating `build.gradle`. Flutter's rename tool or manual steps are needed.
+> [!NOTE]
+> ThruWire is a desktop and web app; mobile runners (`android/`, `ios/`) have been removed.
 
-- [ ] Rename Android package ID from `com.example.logoi` → `com.ThruWire.app`
-  - [ ] `android/app/build.gradle` → update `applicationId "com.ThruWire.app"`
-  - [ ] Rename directory: `android/app/src/main/kotlin/com/example/logoi/` → `com/ThruWire/app/`
-  - [ ] Update `MainActivity.kt` package declaration → `package com.ThruWire.app`
-- [ ] iOS Bundle ID: set `com.ThruWire.app` in `ios/Runner.xcodeproj` (requires Xcode or `agvtool`)
-- [ ] macOS Bundle ID: same update in `macos/Runner.xcodeproj`
+- [ ] macOS Bundle ID: update in `macos/Runner.xcodeproj` (requires Xcode or `agvtool`)
 
 ---
 
@@ -138,8 +132,6 @@
 | `windows/runner/flutter_window.cpp` | Channel `ThruWire/scrcpy_embed` |
 | `windows/CMakeLists.txt` | `BINARY_NAME = ThruWire` |
 | `linux/CMakeLists.txt` | `BINARY_NAME = ThruWire`, app ID |
-| `android/AndroidManifest.xml` | `android:label = ThruWire` |
-| `ios/Runner/Info.plist` | `CFBundleDisplayName = ThruWire` |
 | `web/index.html` | `<title>ThruWire</title>` |
 | `web/manifest.json` | `name: ThruWire` |
 | All 17 test files | `package:ThruWire/` imports |
