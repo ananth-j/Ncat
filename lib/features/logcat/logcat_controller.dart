@@ -39,7 +39,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   final List<LogEntry> _lines = [];
-  List<LogEntry> _visible = const [];
+  final List<LogEntry> _visible = [];
 
   final ScrollController scrollController = ScrollController();
   final TextEditingController searchController = TextEditingController();
@@ -48,6 +48,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   WebSocketChannel? _channel;
   StreamSubscription? _sub;
   Timer? _reconnect;
+  Timer? _searchDebounce;
 
   String _connection = 'connecting';
   String _serverStatus = '';
@@ -284,12 +285,11 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
               trimCount++;
             }
             if (trimCount > 0) {
-              _visible = [..._visible.skip(trimCount), ...passing];
-            } else {
-              _visible = [..._visible, ...passing];
+              _visible.removeRange(0, trimCount);
             }
+            _visible.addAll(passing);
           } else {
-            _visible = [..._visible, ...passing];
+            _visible.addAll(passing);
           }
         } else if (excess > 0 && _visible.isNotEmpty) {
           final minSeq = _lines.first.seq;
@@ -299,7 +299,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
             trimCount++;
           }
           if (trimCount > 0) {
-            _visible = _visible.sublist(trimCount);
+            _visible.removeRange(0, trimCount);
           }
         }
 
@@ -439,14 +439,22 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
   void _recompute() {
     _updateFilterCache();
-    _visible = _lines.where(_matchesFilter).toList(growable: false);
+    _visible
+      ..clear()
+      ..addAll(_lines.where(_matchesFilter));
     notifyListeners();
   }
 
   // User Actions
-  void setSearch(String v) {
+  void setSearch(String v, {bool immediate = true}) {
     _search = v;
-    _recompute();
+    if (immediate) {
+      _searchDebounce?.cancel();
+      _recompute();
+    } else {
+      _searchDebounce?.cancel();
+      _searchDebounce = Timer(const Duration(milliseconds: 150), _recompute);
+    }
   }
 
   void setMinLevel(String v) {
@@ -597,6 +605,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}
     _reconnect?.cancel();
+    _searchDebounce?.cancel();
     _sub?.cancel();
     _channel?.sink.close();
     scrollController.removeListener(_onScroll);

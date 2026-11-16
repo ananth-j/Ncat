@@ -201,7 +201,7 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                     appPid: _controller.appPid,
                     devices: _controller.devices,
                     pickedDevice: _controller.pickedDevice,
-                    onSearch: _controller.setSearch,
+                    onSearch: (v) => _controller.setSearch(v, immediate: false),
                     onLevel: _controller.setMinLevel,
                     onPackage: _controller.applyPackage,
                     onRegex: _controller.toggleRegex,

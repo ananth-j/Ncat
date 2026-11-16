@@ -36,6 +36,17 @@ class LogEntry {
   final String msg;
   final String? pkg;
 
+  /// Numerical rank of severity from 0 (Verbose) to 5 (Assert).
+  int get rank => switch (level) {
+    'V' => 0,
+    'D' => 1,
+    'I' => 2,
+    'W' => 3,
+    'E' => 4,
+    'F' || 'S' => 5,
+    _ => 0,
+  };
+
   factory LogEntry.fromJson(Map<String, dynamic> j) {
     final level = StringPool.intern(j['level'] as String? ?? 'V');
     final tag = StringPool.intern(j['tag'] as String? ?? '');
@@ -52,17 +63,6 @@ class LogEntry {
       pkg: pkg,
     );
   }
-
-  /// Numerical rank of severity from 0 (Verbose) to 5 (Assert).
-  int get rank => switch (level) {
-    'V' => 0,
-    'D' => 1,
-    'I' => 2,
-    'W' => 3,
-    'E' => 4,
-    'F' || 'S' => 5,
-    _ => 0,
-  };
 
   Map<String, dynamic> toJson() => {
     'seq': seq,

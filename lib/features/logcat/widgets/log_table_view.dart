@@ -7,7 +7,7 @@ import 'column_config_dialog.dart';
 import 'log_row.dart';
 
 /// Table view presenting logcat column headers and the scrollable list of log rows.
-class LogTableView extends StatelessWidget {
+class LogTableView extends StatefulWidget {
   const LogTableView({
     super.key,
     required this.entries,
@@ -40,6 +40,19 @@ class LogTableView extends StatelessWidget {
   final ValueChanged<LogColumnConfig> onUpdateColumns;
 
   @override
+  State<LogTableView> createState() => _LogTableViewState();
+}
+
+class _LogTableViewState extends State<LogTableView> {
+  final ValueNotifier<int?> _hoveredSeq = ValueNotifier<int?>(null);
+
+  @override
+  void dispose() {
+    _hoveredSeq.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
 
@@ -50,7 +63,7 @@ class LogTableView extends StatelessWidget {
           child: Stack(
             children: [
               _logList(context, palette),
-              if (!autoScroll)
+              if (!widget.autoScroll)
                 Positioned(
                   right: 18,
                   bottom: 18,
@@ -68,7 +81,7 @@ class LogTableView extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
-                      onPressed: onScrollToEnd,
+                      onPressed: widget.onScrollToEnd,
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -93,6 +106,7 @@ class LogTableView extends StatelessWidget {
       fontWeight: FontWeight.w700,
       letterSpacing: 0.5,
     );
+    final columns = widget.columns;
     return Container(
       height: 28,
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -188,7 +202,7 @@ class LogTableView extends StatelessWidget {
                 (context) => buildColumnMenuItems(
                   palette: palette,
                   columns: columns,
-                  onUpdateColumns: onUpdateColumns,
+                  onUpdateColumns: widget.onUpdateColumns,
                 ),
           ),
         ],
@@ -197,7 +211,7 @@ class LogTableView extends StatelessWidget {
   }
 
   Widget _logList(BuildContext context, AppPalette palette) {
-    if (entries.isEmpty) {
+    if (widget.entries.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -209,7 +223,7 @@ class LogTableView extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              totalLinesCount == 0
+              widget.totalLinesCount == 0
                   ? 'Waiting for log output...'
                   : 'Nothing matches the current filter.',
               style: TextStyle(color: palette.dim, fontSize: 13),
@@ -221,26 +235,33 @@ class LogTableView extends StatelessWidget {
 
     return SelectionArea(
       child: Scrollbar(
-        controller: scrollController,
+        controller: widget.scrollController,
         thumbVisibility: true,
         interactive: true,
-        child: ListView.builder(
-          controller: scrollController,
-          itemExtent: wrap ? null : 24.0,
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          itemCount: entries.length,
-          itemBuilder: (context, i) {
-            final e = entries[i];
-            return LogRow(
-              key: ValueKey(e.seq),
-              entry: e,
-              columns: columns,
-              wrap: wrap,
-              appPid: appPid,
-              packageFilter: packageFilter,
-              onCopy: () => onCopy(e),
-              onFilterTag: () => onFilterTag(e.tag),
-              onFilterPackage: onFilterPackage,
+        child: ValueListenableBuilder<int?>(
+          valueListenable: _hoveredSeq,
+          builder: (context, hoveredSeq, _) {
+            return ListView.builder(
+              controller: widget.scrollController,
+              itemExtent: widget.wrap ? null : 24.0,
+              addAutomaticKeepAlives: false,
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              itemCount: widget.entries.length,
+              itemBuilder: (context, i) {
+                final e = widget.entries[i];
+                return LogRow(
+                  entry: e,
+                  columns: widget.columns,
+                  wrap: widget.wrap,
+                  appPid: widget.appPid,
+                  packageFilter: widget.packageFilter,
+                  hoveredSeq: hoveredSeq,
+                  onHover: (seq) => _hoveredSeq.value = seq,
+                  onCopy: widget.onCopy,
+                  onFilterTag: widget.onFilterTag,
+                  onFilterPackage: widget.onFilterPackage,
+                );
+              },
             );
           },
         ),

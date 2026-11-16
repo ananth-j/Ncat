@@ -51,7 +51,7 @@ class DeviceSession {
   bool _isDisposed = false;
 
   final List<Map<String, dynamic>> _history = [];
-  final List<Map<String, dynamic>> _pending = [];
+  List<Map<String, dynamic>> _pending = [];
   final Map<int, String> _pidToProcess = {};
   int _psTicks = 0;
 
@@ -75,9 +75,8 @@ class DeviceSession {
   /// Flushes pending log entries, appending to history and returning the batch.
   List<Map<String, dynamic>> flushPending() {
     if (_pending.isEmpty) return const [];
-    final batch = List<Map<String, dynamic>>.from(_pending);
-    _pending.clear();
-
+    final batch = _pending;
+    _pending = [];
     _history.addAll(batch);
     if (_history.length > kHistorySize) {
       _history.removeRange(0, _history.length - kHistorySize);

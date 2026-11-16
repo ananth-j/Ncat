@@ -14,24 +14,25 @@ class LogQuery {
 }
 
 class LogQueryTerm {
-  const LogQueryTerm({
+  LogQueryTerm({
     required this.field,
     required this.value,
     required this.negated,
     required this.regex,
     this.compiledRegex,
-  });
+  }) : _lowerValue = value.toLowerCase();
 
   final String? field;
   final String value;
   final bool negated;
   final bool regex;
   final RegExp? compiledRegex;
+  final String _lowerValue;
 
   bool matches(String candidate) {
     final matched = regex
         ? compiledRegex?.hasMatch(candidate) ?? false
-        : candidate.toLowerCase().contains(value.toLowerCase());
+        : candidate.toLowerCase().contains(_lowerValue);
     return negated ? !matched : matched;
   }
 }
