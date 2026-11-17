@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../src/palette.dart';
 
 AppThemeChoice _nextThemeChoice(AppThemeChoice choice) => switch (choice) {
-  AppThemeChoice.system => AppThemeChoice.light,
+  AppThemeChoice.system => AppThemeChoice.androidStudio,
+  AppThemeChoice.androidStudio => AppThemeChoice.light,
   AppThemeChoice.light => AppThemeChoice.darkModern,
   AppThemeChoice.darkModern => AppThemeChoice.vsDark,
   AppThemeChoice.vsDark => AppThemeChoice.system,
@@ -11,6 +12,7 @@ AppThemeChoice _nextThemeChoice(AppThemeChoice choice) => switch (choice) {
 
 IconData _themeChoiceIcon(AppThemeChoice choice) => switch (choice) {
   AppThemeChoice.system => Icons.brightness_auto,
+  AppThemeChoice.androidStudio => Icons.android,
   AppThemeChoice.light => Icons.light_mode,
   AppThemeChoice.darkModern => Icons.dark_mode,
   AppThemeChoice.vsDark => Icons.contrast,
@@ -18,6 +20,7 @@ IconData _themeChoiceIcon(AppThemeChoice choice) => switch (choice) {
 
 String _themeChoiceLabel(AppThemeChoice choice) => switch (choice) {
   AppThemeChoice.system => 'Theme: Auto (System)',
+  AppThemeChoice.androidStudio => 'Theme: Android Studio Darcula',
   AppThemeChoice.light => 'Theme: Modern Light',
   AppThemeChoice.darkModern => 'Theme: Dark Modern',
   AppThemeChoice.vsDark => 'Theme: VS Dark',

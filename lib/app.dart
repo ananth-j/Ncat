@@ -13,7 +13,7 @@ class LogcatApp extends StatefulWidget {
 }
 
 class _LogcatAppState extends State<LogcatApp> {
-  AppThemeChoice _themeChoice = AppThemeChoice.system;
+  AppThemeChoice _themeChoice = AppThemeChoice.androidStudio;
   bool _userChangedTheme = false;
 
   @override
@@ -33,9 +33,11 @@ class _LogcatAppState extends State<LogcatApp> {
   @override
   Widget build(BuildContext context) {
     final darkPalette =
-        _themeChoice == AppThemeChoice.vsDark
-            ? kVsDarkPalette
-            : kDarkModernPalette;
+        switch (_themeChoice) {
+          AppThemeChoice.vsDark => kVsDarkPalette,
+          AppThemeChoice.darkModern => kDarkModernPalette,
+          _ => kAndroidStudioPalette,
+        };
 
     return MaterialApp(
       title: 'ThruWire',
@@ -45,7 +47,9 @@ class _LogcatAppState extends State<LogcatApp> {
       themeMode: switch (_themeChoice) {
         AppThemeChoice.system => ThemeMode.system,
         AppThemeChoice.light => ThemeMode.light,
-        AppThemeChoice.darkModern || AppThemeChoice.vsDark => ThemeMode.dark,
+        AppThemeChoice.androidStudio ||
+        AppThemeChoice.darkModern ||
+        AppThemeChoice.vsDark => ThemeMode.dark,
       },
       home: LogcatPage(
         themeChoice: _themeChoice,

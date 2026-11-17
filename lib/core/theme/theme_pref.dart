@@ -8,9 +8,10 @@ Future<AppThemeChoice> loadThemeChoice() async {
   final prefs = await SharedPreferences.getInstance();
   return switch (prefs.getString(_kThemeChoiceKey)) {
     'light' => AppThemeChoice.light,
+    'androidStudio' => AppThemeChoice.androidStudio,
     'darkModern' => AppThemeChoice.darkModern,
     'vsDark' => AppThemeChoice.vsDark,
-    _ => AppThemeChoice.system,
+    _ => AppThemeChoice.androidStudio,
   };
 }
 

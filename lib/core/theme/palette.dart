@@ -82,7 +82,30 @@ class AppPalette extends ThemeExtension<AppPalette> {
 /// Which visual theme is active. Plain [ThemeMode] only distinguishes a
 /// single light/dark pair, but this app offers two different dark looks
 /// (VS Code "Dark Modern" and classic "Dark+"), so it needs its own choice.
-enum AppThemeChoice { system, light, darkModern, vsDark }
+enum AppThemeChoice { system, light, androidStudio, darkModern, vsDark }
+
+/// Android Studio's modern Darcula workspace palette.
+const kAndroidStudioPalette = AppPalette(
+  bg: Color(0xFF1E1F22),
+  panel: Color(0xFF2B2D30),
+  border: Color(0xFF393B40),
+  text: Color(0xFFCFD0D4),
+  dim: Color(0xFF8C8F98),
+  accent: Color(0xFF4B9EFF),
+  accentBg: Color(0xFF253A56),
+  selectedBg: Color(0xFF34445C),
+  statusBarBg: Color(0xFF2B2D30),
+  statusBarText: Color(0xFFB8B9BE),
+  levelColor: {
+    'V': Color(0xFF8C8F98),
+    'D': Color(0xFF7AB8F5),
+    'I': Color(0xFF6AAB73),
+    'W': Color(0xFFE2C06B),
+    'E': Color(0xFFF07178),
+    'F': Color(0xFFC792EA),
+    'S': Color(0xFF8C8F98),
+  },
+);
 
 /// VS Code's "Dark Modern" theme — flat, near-black chrome with a Microsoft-blue accent.
 const kDarkModernPalette = AppPalette(
