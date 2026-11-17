@@ -243,9 +243,9 @@ class _LogTableViewState extends State<LogTableView> {
           builder: (context, hoveredSeq, _) {
             return ListView.builder(
               controller: widget.scrollController,
-              itemExtent: widget.wrap ? null : 24.0,
+              itemExtent: widget.wrap ? null : 23.0,
               addAutomaticKeepAlives: false,
-              padding: const EdgeInsets.symmetric(vertical: 2),
+              padding: EdgeInsets.zero,
               itemCount: widget.entries.length,
               itemBuilder: (context, i) {
                 final e = widget.entries[i];

@@ -9,7 +9,7 @@ import '../models/log_entry.dart';
 const _monoStyle = TextStyle(
   fontFamily: 'monospace',
   fontSize: 11.5,
-  height: 1.4,
+  height: 1.25,
 );
 
 /// Single log entry row in the log table.
@@ -183,7 +183,7 @@ class LogRow extends StatelessWidget {
       color: levelColor,
       fontWeight: FontWeight.w600,
     );
-    final msgStyle = _monoStyle.copyWith(color: msgColor, fontSize: 13.5);
+    final msgStyle = _monoStyle.copyWith(color: msgColor, fontSize: 12.5);
 
     final hovered = hoveredSeq == entry.seq;
 
@@ -196,14 +196,15 @@ class LogRow extends StatelessWidget {
             : (entry.pid == 0 ? 'system' : '-'));
 
     return GestureDetector(
-      onSecondaryTapDown: (details) => showContextMenu(
-        context,
-        details: details,
-        entry: entry,
-        onCopy: onCopy,
-        onFilterTag: onFilterTag,
-        onFilterPackage: onFilterPackage,
-      ),
+      onSecondaryTapDown:
+          (details) => showContextMenu(
+            context,
+            details: details,
+            entry: entry,
+            onCopy: onCopy,
+            onFilterTag: onFilterTag,
+            onFilterPackage: onFilterPackage,
+          ),
       child: MouseRegion(
         onEnter: (_) => onHover?.call(entry.seq),
         onExit: (_) => onHover?.call(null),
@@ -212,7 +213,7 @@ class LogRow extends StatelessWidget {
               hovered
                   ? palette.selectedBg.withValues(alpha: 0.4)
                   : Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1.6),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -220,11 +221,7 @@ class LogRow extends StatelessWidget {
               if (columns.showTime) ...[
                 SizedBox(
                   width: 110,
-                  child: Text(
-                    entry.time,
-                    style: dimStyle85,
-                    maxLines: 1,
-                  ),
+                  child: Text(entry.time, style: dimStyle85, maxLines: 1),
                 ),
                 const SizedBox(width: 6),
               ],
@@ -305,6 +302,12 @@ class LogRow extends StatelessWidget {
                   child: IconButton(
                     icon: Icon(Icons.copy, size: 12, color: palette.dim),
                     onPressed: () => onCopy(entry),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
                   ),
                 ),
               ),
