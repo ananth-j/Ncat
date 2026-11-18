@@ -55,6 +55,14 @@ String findAdbPath() {
       final p = '$home/Library/Android/sdk/platform-tools/adb';
       if (File(p).existsSync()) return p;
     }
+    // ANDROID_HOME / ANDROID_SDK_ROOT are common on CI and developer machines
+    final androidHome =
+        Platform.environment['ANDROID_HOME'] ??
+        Platform.environment['ANDROID_SDK_ROOT'];
+    if (androidHome != null && androidHome.isNotEmpty) {
+      final p = '$androidHome/platform-tools/adb';
+      if (File(p).existsSync()) return p;
+    }
     for (final p in ['/opt/homebrew/bin/adb', '/usr/local/bin/adb']) {
       if (File(p).existsSync()) return p;
     }
@@ -62,6 +70,14 @@ String findAdbPath() {
     final home = Platform.environment['HOME'];
     if (home != null && home.isNotEmpty) {
       final p = '$home/Android/Sdk/platform-tools/adb';
+      if (File(p).existsSync()) return p;
+    }
+    // ANDROID_HOME / ANDROID_SDK_ROOT are common on CI and developer machines
+    final androidHome =
+        Platform.environment['ANDROID_HOME'] ??
+        Platform.environment['ANDROID_SDK_ROOT'];
+    if (androidHome != null && androidHome.isNotEmpty) {
+      final p = '$androidHome/platform-tools/adb';
       if (File(p).existsSync()) return p;
     }
     for (final p in [

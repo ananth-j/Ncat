@@ -171,12 +171,15 @@ class ScrcpyResolver {
     return 'x86_64'; // safe default for desktop Linux
   }
 
-  /// Returns the official download URL for the host operating system.
+  /// Returns the official download URL for the host operating system,
+  /// or `null` when no prebuilt binary is available for the current platform.
   static String? getDownloadUrl() {
     const base =
         'https://github.com/Genymobile/scrcpy/releases/download/$version';
     if (Platform.isWindows) {
-      // 64-bit Windows is standard
+      // No native Windows ARM64 scrcpy binary exists upstream.
+      // The win64 (x86_64) release runs transparently via x64 emulation on
+      // Windows 11 ARM — this is the correct and only option for ARM Windows.
       return '$base/scrcpy-win64-$version.zip';
     } else if (Platform.isMacOS) {
       // Use uname -m for reliable Apple Silicon vs Intel detection
@@ -184,12 +187,19 @@ class ScrcpyResolver {
           ? '$base/scrcpy-macos-aarch64-$version.tar.gz'
           : '$base/scrcpy-macos-x86_64-$version.tar.gz';
     } else if (Platform.isLinux) {
-      // Support ARM Linux (Raspberry Pi, Asahi, etc.) where available
       final arch = _linuxArch();
       if (arch == 'aarch64' || arch == 'arm64') {
+        // 64-bit ARM Linux (Raspberry Pi 4/5 64-bit, Asahi Linux, etc.)
         return '$base/scrcpy-linux-aarch64-$version.tar.gz';
       }
-      return '$base/scrcpy-linux-x86_64-$version.tar.gz';
+      if (arch == 'x86_64' || arch == 'amd64') {
+        return '$base/scrcpy-linux-x86_64-$version.tar.gz';
+      }
+      // 32-bit ARM (armv7l, armhf) and other architectures have no official
+      // upstream binary — the user must install scrcpy via their system
+      // package manager (apt, pacman, etc.). Return null so the caller
+      // surfaces an appropriate message instead of downloading a broken binary.
+      return null;
     }
     return null;
   }
@@ -204,11 +214,14 @@ class ScrcpyResolver {
 
     final downloadUrl = getDownloadUrl();
     if (downloadUrl == null) {
-      return {
-        'status': 'error',
-        'message':
-            'Unsupported operating system for automated scrcpy installation',
-      };
+      // Build a helpful message: on Linux unsupported arch (e.g. armv7l) the
+      // user must install scrcpy via their system package manager.
+      final hint = Platform.isLinux
+          ? 'No prebuilt scrcpy binary is available for this CPU architecture '
+              '(${_linuxArch()}). Install scrcpy via your system package '
+              'manager (e.g. `apt install scrcpy`, `pacman -S scrcpy`).'
+          : 'No prebuilt scrcpy binary is available for this operating system.';
+      return {'status': 'error', 'message': hint};
     }
 
     final destDir = getLocalScrcpyDir();
