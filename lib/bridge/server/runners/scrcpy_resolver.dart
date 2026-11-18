@@ -125,16 +125,50 @@ class ScrcpyResolver {
         if (File(p).existsSync()) return p;
       }
     } else if (Platform.isLinux) {
+      final home = Platform.environment['HOME'] ?? '';
       for (final p in [
         '/usr/bin/scrcpy',
         '/usr/local/bin/scrcpy',
         '/snap/bin/scrcpy',
+        '/var/lib/flatpak/exports/bin/scrcpy',
+        if (home.isNotEmpty)
+          '$home/.local/share/flatpak/exports/bin/scrcpy',
       ]) {
         if (File(p).existsSync()) return p;
       }
     }
 
     return null;
+  }
+
+  /// Detects whether the current macOS host is running on Apple Silicon (ARM64).
+  ///
+  /// Uses `uname -m` for a reliable hardware check, with a fallback to
+  /// [Platform.version] in case the subprocess cannot be spawned.
+  static bool _isMacArm64() {
+    try {
+      final res = Process.runSync('uname', ['-m']);
+      if (res.exitCode == 0) {
+        final arch = res.stdout.toString().trim().toLowerCase();
+        return arch == 'arm64' || arch == 'aarch64';
+      }
+    } catch (_) {}
+    // Fallback: Dart VM version string contains the target arch on Apple Silicon
+    return Platform.version.contains('arm64') ||
+        Platform.version.contains('aarch64');
+  }
+
+  /// Detects the CPU architecture on Linux using `uname -m`.
+  ///
+  /// Returns the raw machine string (e.g. `x86_64`, `aarch64`, `armv7l`).
+  static String _linuxArch() {
+    try {
+      final res = Process.runSync('uname', ['-m']);
+      if (res.exitCode == 0) {
+        return res.stdout.toString().trim().toLowerCase();
+      }
+    } catch (_) {}
+    return 'x86_64'; // safe default for desktop Linux
   }
 
   /// Returns the official download URL for the host operating system.
@@ -145,14 +179,16 @@ class ScrcpyResolver {
       // 64-bit Windows is standard
       return '$base/scrcpy-win64-$version.zip';
     } else if (Platform.isMacOS) {
-      // macOS Apple Silicon (ARM64) or Intel
-      final isArm =
-          Platform.version.contains('arm64') ||
-          Platform.version.contains('aarch64');
-      return isArm
+      // Use uname -m for reliable Apple Silicon vs Intel detection
+      return _isMacArm64()
           ? '$base/scrcpy-macos-aarch64-$version.tar.gz'
           : '$base/scrcpy-macos-x86_64-$version.tar.gz';
     } else if (Platform.isLinux) {
+      // Support ARM Linux (Raspberry Pi, Asahi, etc.) where available
+      final arch = _linuxArch();
+      if (arch == 'aarch64' || arch == 'arm64') {
+        return '$base/scrcpy-linux-aarch64-$version.tar.gz';
+      }
       return '$base/scrcpy-linux-x86_64-$version.tar.gz';
     }
     return null;

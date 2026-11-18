@@ -64,7 +64,13 @@ String findAdbPath() {
       final p = '$home/Android/Sdk/platform-tools/adb';
       if (File(p).existsSync()) return p;
     }
-    if (File('/usr/bin/adb').existsSync()) return '/usr/bin/adb';
+    for (final p in [
+      '/usr/bin/adb',
+      '/usr/local/bin/adb',
+      '/snap/bin/adb',
+    ]) {
+      if (File(p).existsSync()) return p;
+    }
   }
 
   return 'adb';
