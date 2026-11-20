@@ -305,6 +305,7 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                         Expanded(
                           child: LogTableView(
                             entries: _controller.visible,
+                            entriesNotifier: _controller.visibleNotifier,
                             totalLinesCount: _controller.lines.length,
                             columns: _controller.columns,
                             wrap: _controller.wrap,

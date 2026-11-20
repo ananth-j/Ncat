@@ -41,6 +41,16 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   final List<LogEntry> _lines = [];
   final List<LogEntry> _visible = [];
 
+  /// A dedicated [ValueNotifier] for the visible list.
+  ///
+  /// UI components that only need to react to new log rows (e.g. the log
+  /// table) should subscribe to this notifier rather than the full
+  /// [ChangeNotifier]. That way incoming log batches do not force a rebuild
+  /// of every widget that listens to the controller — only the list view
+  /// itself is rebuilt.
+  final ValueNotifier<List<LogEntry>> visibleNotifier =
+      ValueNotifier<List<LogEntry>>([]);
+
   final ScrollController scrollController = ScrollController();
   final TextEditingController searchController = TextEditingController();
   final TextEditingController pkgController = TextEditingController();
@@ -141,19 +151,49 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Fixed row height used by [ListView.builder] when wrap is off.
+  /// Must stay in sync with the [itemExtent] value in [LogTableView._logList].
+  static const double _rowExtent = 23.0;
+
+  /// Jumps the scroll position to the bottom of the list.
+  ///
+  /// When [wrap] is off the list uses a fixed [itemExtent], so we can
+  /// calculate the exact target offset from the item count without waiting
+  /// for a layout frame — eliminating the one-frame stutter caused by using
+  /// [maxScrollExtent] inside a [WidgetsBinding.addPostFrameCallback].
+  ///
+  /// When [wrap] is on row heights vary, so we fall back to [maxScrollExtent]
+  /// (still in a post-frame callback, but that case is rare while streaming).
   void scrollToBottom() {
-    if (!_isAppActive) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_autoScroll && scrollController.hasClients) {
-        scrollController.jumpTo(scrollController.position.maxScrollExtent);
-      }
-    });
+    if (!_isAppActive || !scrollController.hasClients) return;
+
+    if (!_wrap && _visible.isNotEmpty) {
+      // Fixed-height fast path: compute offset from item count directly.
+      // This fires synchronously in the same frame — no layout round-trip needed.
+      final viewportHeight = scrollController.position.viewportDimension;
+      final totalHeight = _visible.length * _rowExtent;
+      final target = (totalHeight - viewportHeight).clamp(
+        0.0,
+        double.infinity,
+      );
+      scrollController.jumpTo(target);
+    } else {
+      // Variable-height fallback: wait for layout to know maxScrollExtent.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_autoScroll && scrollController.hasClients) {
+          scrollController.jumpTo(scrollController.position.maxScrollExtent);
+        }
+      });
+    }
   }
 
   void scrollToEnd() {
+    // Jump first — before notifyListeners() triggers a rebuild.
+    // This way the scroll position is already at the bottom when Flutter
+    // lays out the new frame, so the user never sees the intermediate state.
+    scrollToBottom();
     _autoScroll = true;
     notifyListeners();
-    scrollToBottom();
   }
 
   void scrollToTop() {
@@ -304,6 +344,9 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
         }
 
         // Phase 2.1: Exactly one notifyListeners per incoming batch
+        // Also publish the updated visible list to visibleNotifier so the
+        // log table can rebuild independently of the full controller listeners.
+        visibleNotifier.value = List<LogEntry>.unmodifiable(_visible);
         notifyListeners();
         if (_autoScroll) {
           scrollToBottom();
@@ -442,6 +485,8 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     _visible
       ..clear()
       ..addAll(_lines.where(_matchesFilter));
+    // Publish a new list reference so visibleNotifier listeners rebuild.
+    visibleNotifier.value = List<LogEntry>.unmodifiable(_visible);
     notifyListeners();
   }
 
@@ -612,6 +657,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     scrollController.dispose();
     searchController.dispose();
     pkgController.dispose();
+    visibleNotifier.dispose();
     stopBridge();
     super.dispose();
   }
