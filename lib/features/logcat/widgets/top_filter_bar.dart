@@ -76,11 +76,15 @@ class TopFilterBar extends StatelessWidget {
       height: 32,
       width: 185,
       child: TextField(
+        expands: true,
+        minLines: null,
+        maxLines: null,
         controller: pkgCtrl,
         onSubmitted: (_) => onPackage(),
         style: TextStyle(fontSize: 12, color: palette.text),
         decoration: InputDecoration(
-          hintText: 'package:mine or pkg',
+          constraints: const BoxConstraints.tightFor(height: 32),
+          hintText: 'package : mine',
           hintStyle: TextStyle(fontSize: 12, color: palette.dim),
           filled: true,
           fillColor: palette.bg,
@@ -158,10 +162,14 @@ class TopFilterBar extends StatelessWidget {
       child: SizedBox(
         height: 32,
         child: TextField(
+          expands: true,
+          minLines: null,
+          maxLines: null,
           controller: searchCtrl,
           onChanged: onSearch,
           style: TextStyle(fontSize: 12, color: palette.text),
           decoration: InputDecoration(
+            constraints: const BoxConstraints.tightFor(height: 32),
             hintText: 'tag:MainActivity level:ERROR message:failed',
             hintStyle: TextStyle(fontSize: 12, color: palette.dim),
             filled: true,
