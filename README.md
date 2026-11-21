@@ -1,10 +1,9 @@
 # ThruWire 🐱
 
-[![CI](https://github.com/ananth-j/ThruWire/actions/workflows/ci.yml/badge.svg)](https://github.com/ananth-j/ThruWire/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/ananth-j/ThruWire?color=02569B&label=Release)](https://github.com/ananth-j/ThruWire/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Flutter](https://img.shields.io/badge/Flutter-3.24%2B-02569B?logo=flutter)](https://flutter.dev)
-[![Dart](https://img.shields.io/badge/Dart-3.5%2B-0175C2?logo=dart)](https://dart.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.44%2B-02569B?logo=flutter)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.13%2B-0175C2?logo=dart)](https://dart.dev)
 
 A modern, performance-first Android companion and `adb logcat` desktop/web viewer. Built with Flutter and a lightweight Dart bridge server. No Android Studio or heavy IDE required — just `adb`, your device, and `ThruWire`.
 
