@@ -93,8 +93,7 @@ class MirrorController {
     if (status == 'launched') {
       errorMessage.value = null;
       isScrcpyRunning.value = true;
-      isScrcpyEmbedded.value =
-          !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+      isScrcpyEmbedded.value = defaultTargetPlatform == TargetPlatform.windows;
     } else {
       isScrcpyRunning.value = false;
       isScrcpyEmbedded.value = false;

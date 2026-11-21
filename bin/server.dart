@@ -2,21 +2,19 @@
 // batches of structured entries to any connected WebSocket client.
 //
 //   dart run bin/server.dart
-//   dart run bin/server.dart --port 8080 --web ../web/build/web
+//   dart run bin/server.dart --port 8080
 
 import 'dart:io';
 import 'package:thruwire/src/bridge_server_io.dart';
 
 Future<void> main(List<String> args) async {
   final port = int.tryParse(_argValue(args, '--port') ?? '') ?? 8080;
-  final webRoot = _argValue(args, '--web');
   final adb = Platform.environment['ADB'] ?? findAdbPath();
   final token = _argValue(args, '--token');
   final requireAuth = args.contains('--auth') || token != null;
 
   final server = LogcatBridgeServer(
     port: port,
-    webRoot: webRoot,
     adbPath: adb,
     authToken: token,
     requireAuth: requireAuth,

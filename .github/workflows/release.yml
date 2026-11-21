@@ -29,11 +29,6 @@ jobs:
             build_cmd: flutter build linux --release
             artifact_dir: build/linux/x64/release/bundle
             archive_name: thruwire-linux-x64.tar.gz
-          - platform: web
-            os: ubuntu-latest
-            build_cmd: flutter build web --release
-            artifact_dir: build/web
-            archive_name: thruwire-web.zip
 
     steps:
       - name: Checkout repository
@@ -70,10 +65,6 @@ jobs:
       - name: Package artifact (Linux)
         if: matrix.platform == 'linux'
         run: tar -czvf ${{ matrix.archive_name }} -C ${{ matrix.artifact_dir }} .
-
-      - name: Package artifact (Web)
-        if: matrix.platform == 'web'
-        run: zip -r ${{ matrix.archive_name }} ${{ matrix.artifact_dir }}
 
       - name: Upload build archive
         uses: actions/upload-artifact@v4

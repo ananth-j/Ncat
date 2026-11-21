@@ -25,7 +25,7 @@ If applicable, add screenshots or bridge terminal logs to help explain your prob
 - OS: [e.g. Windows 11, macOS Sequoia, Ubuntu 24.04]
 - Flutter Version: [e.g. 3.24.0]
 - Target Android Device/AVD: [e.g. Pixel 8, API 34]
-- Connection Mode: [e.g. Desktop embedded bridge / Web Chrome]
+- Connection Mode: [e.g. Desktop embedded bridge / Standalone CLI bridge]
 
 **Additional context**
 Add any other context about the problem here.

@@ -10,7 +10,6 @@
 analyzer:
   exclude:
     - build/**
-    - web/**
     - windows/**
     - macos/**
     - linux/**

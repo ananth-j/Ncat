@@ -16,7 +16,7 @@ import '../widgets/presets_dialog.dart';
 import '../widgets/status_bar.dart';
 import '../widgets/top_filter_bar.dart';
 
-/// Main desktop/web viewport displaying the toolbar, logcat grid, and status indicators.
+/// Main desktop viewport displaying the toolbar, logcat grid, and status indicators.
 class LogcatPage extends StatefulWidget {
   const LogcatPage({
     super.key,

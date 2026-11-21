@@ -5,7 +5,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.44%2B-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.13%2B-0175C2?logo=dart)](https://dart.dev)
 
-A modern, performance-first Android companion and `adb logcat` desktop/web viewer. Built with Flutter and a lightweight Dart bridge server. No Android Studio or heavy IDE required — just `adb`, your device, and `ThruWire`.
+A modern, performance-first Android companion and `adb logcat` desktop viewer. Built with Flutter and a lightweight Dart bridge server. No Android Studio or heavy IDE required — just `adb`, your device, and `ThruWire`.
 
 ```text
 Android device(s) ───adb───▶ ThruWire bridge (127.0.0.1:8080) ───WebSocket/HTTP───▶ Flutter UI
@@ -27,7 +27,6 @@ Pre-compiled standalone binaries for the latest release are available on [**GitH
 | **Windows** | [`thruwire-windows-x64.zip`](https://github.com/ananth-j/ThruWire/releases/latest) | x86_64 | Portable Windows desktop app with embedded bridge & scrcpy window host |
 | **macOS** | [`thruwire-macos.zip`](https://github.com/ananth-j/ThruWire/releases/latest) | Universal (x86_64 / arm64) | macOS application bundle with background bridge manager |
 | **Linux** | [`thruwire-linux-x64.tar.gz`](https://github.com/ananth-j/ThruWire/releases/latest) | x86_64 | Linux GTK release bundle |
-| **Web** | [`thruwire-web.zip`](https://github.com/ananth-j/ThruWire/releases/latest) | Web (WASM / CanvasKit) | Standalone client bundle hostable via `dart run bin/server.dart --web` |
 
 👉 **[Download the Latest Release (v1.0.0)](https://github.com/ananth-j/ThruWire/releases/latest)**
 
@@ -73,30 +72,17 @@ Pre-compiled standalone binaries for the latest release are available on [**GitH
 
 ## 🛠️ Quickstart
 
-### Option A: Desktop (Windows, macOS, Linux)
-On desktop platforms, ThruWire automatically launches the embedded bridge server in the background:
+ThruWire automatically launches the embedded bridge server in the background:
 
 ```bash
 flutter pub get
 flutter run -d windows    # or macos / linux
 ```
 
-### Option B: Web Browser
-When running via Chrome or hosting as a web companion:
-
-1. Start the standalone bridge server:
-   ```bash
-   dart run bin/server.dart
-   ```
-2. Start or build the web client:
-   ```bash
-   flutter run -d chrome
-   ```
-   *Or serve the production web bundle directly through the bridge:*
-   ```bash
-   flutter build web
-   dart run bin/server.dart --web build/web
-   ```
+*(Optional) You can also run the bridge independently from the command line:*
+```bash
+dart run bin/server.dart
+```
 
 ---
 

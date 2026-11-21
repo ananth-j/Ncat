@@ -8,11 +8,11 @@
 
 ```mermaid
 flowchart TD
-    subgraph Frontend["Flutter Frontend (Desktop: Windows / macOS / Linux | Web: Browser)"]
+    subgraph Frontend["Flutter Frontend (Desktop: Windows / macOS / Linux)"]
         UI["LogTable View & DeviceTabBar"]
         MC["MirrorController & CaptureService"]
         LC["LogcatController (Virtualized 60 FPS State)"]
-        CC["CaptureClient (Cross-Platform IO/Web)"]
+        CC["CaptureClient (HTTP & Native Media)"]
     end
 
     subgraph Bridge["Dart Bridge Server (127.0.0.1:8080)"]
@@ -48,7 +48,7 @@ flowchart TD
 ```text
 ┌────────────────────────────────────────────────────────┐
 │                   Flutter Frontend                     │
-│  (Desktop: Windows / macOS / Linux  |  Web: Browser)   │
+│        (Desktop: Windows / macOS / Linux)              │
 └───────────────▲────────────────────────▲───────────────┘
          Control & Logs (WS)         scrcpy native client
          JSON Batches / 100ms        H.264 decode and display
@@ -118,12 +118,10 @@ All device state is encapsulated in `DeviceSession`:
 - **`LogcatController`**: Manages view state, search queries, severity filters, column configuration, and per-device tab state (`DeviceTabState`). When the app is minimized or hidden, it enters **Background Mode**, buffering logs in memory without rebuilding the UI widget tree.
 - **`MirrorController`**: Starts scrcpy on demand, forwards touch/key/text inputs to the bridge, and tracks mirror pane lifecycles.
 - **`CaptureService`**: Coordinates single-shot screenshots and hardware video recording with toolbar badge countdowns.
-- **`CaptureClient`**: Cross-platform abstraction (`capture_client_io.dart` and `capture_client_web.dart`) that handles HTTP media streaming and triggers native file download dialogs across desktop file systems and web browsers.
+- **`CaptureClient`**: Service handling HTTP media streaming and triggering native file download dialogs.
 
 ### 3.3 Bridge Management (`lib/bridge/`)
-- **Conditional Compilation**: Uses Dart conditional imports (`bridge_manager_io.dart` vs `bridge_manager_stub.dart`) so the app compiles seamlessly to native desktop executables and pure Web (WASM/JS).
-- **Desktop**: Automatically spawns and manages `LogcatBridgeServer` inside the application process.
-- **Web**: Connects to the standalone bridge server via WebSocket/HTTP on `localhost:8080`.
+- Automatically spawns and manages `LogcatBridgeServer` in the background within the desktop application process. Can also run as a standalone CLI bridge (`dart run bin/server.dart`).
 
 ### 3.4 Process & ADB Runner Layer (`lib/bridge/server/runners/`)
 - **`ProcessRunner` Interface**: Abstraction over `dart:io Process` allowing complete unit and integration testing without requiring real hardware or ADB binaries via `FakeProcessRunner`.

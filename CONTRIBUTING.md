@@ -39,7 +39,7 @@ Before making significant changes, please review:
 2. **Device Isolation**: All state on the bridge and frontend must be isolated by device serial (`DeviceSession`). Never assume a single global device.
 3. **Loopback Only**: Network services must only bind to `127.0.0.1`.
 4. **Clean Code & Zero Warnings**: Code must produce 0 analyzer issues (`flutter analyze --fatal-infos`).
-5. **Cross-Platform Compatibility**: Do not import `dart:io` in files that compile to Web. Use the conditional import pattern (`lib/bridge/bridge_manager_io.dart` vs `lib/bridge/bridge_manager_stub.dart`).
+5. **Desktop Platform Compatibility**: Ensure changes work seamlessly across Windows, macOS, and Linux desktop runners.
 
 ---
 

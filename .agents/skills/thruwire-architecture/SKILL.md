@@ -147,7 +147,7 @@ class DeviceSession {
 ### B. Screenshot Implementation
 - Command: `adb -s <serial> exec-out screencap -p`
 - Transport: Bridge serves `GET /api/screenshot?serial=<serial>` returning `image/png`.
-- Frontend: Downloads or saves directly to disk using `export_io.dart` / `export_web.dart`.
+- Frontend: Downloads or saves directly to disk using `export_io.dart`.
 
 ### C. Screen Recording Implementation
 - Native Android recording requires no desktop video encoding:
@@ -166,4 +166,4 @@ class DeviceSession {
 1. **Keep `main.dart` minimal**: No UI widgets or business logic in `main.dart`.
 2. **Never commit hardcoded ADB paths**: Always resolve through `findAdbPath()` or user configuration.
 3. **Handle disconnected devices gracefully**: Devices can unplug at any millisecond. All ADB runners must handle process termination without crashing the bridge server.
-4. **Maintain cross-platform support**: Do not introduce OS-specific packages that break macOS, Linux, Windows, or Web builds. Use conditional imports (`*_io.dart` / `*_stub.dart` / `*_web.dart`).
+4. **Maintain cross-platform desktop support**: Do not introduce OS-specific packages that break macOS, Linux, or Windows builds.
