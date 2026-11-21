@@ -239,7 +239,7 @@ class DeviceSession {
         'shell',
         'rm',
         '-f',
-        '/sdcard/wcat_*.mp4',
+        '/sdcard/thruwire_*.mp4',
       ]);
     } catch (_) {}
   }
@@ -320,7 +320,7 @@ class DeviceSession {
 
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final sanitizedSerial = serial.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-    final remotePath = '/sdcard/wcat_${sanitizedSerial}_$timestamp.mp4';
+    final remotePath = '/sdcard/thruwire_${sanitizedSerial}_$timestamp.mp4';
     _currentRecordingDevicePath = remotePath;
     _recordingStartedAt = DateTime.now();
 
@@ -397,7 +397,7 @@ class DeviceSession {
 
       // 3. Pull file to local temp
       final localTemp =
-          '${Directory.systemTemp.path}/wcat_${DateTime.now().millisecondsSinceEpoch}.mp4';
+          '${Directory.systemTemp.path}/thruwire_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final pullResult = await processRunner.run(adbPath, [
         '-s',
         serial,

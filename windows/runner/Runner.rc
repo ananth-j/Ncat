@@ -93,7 +93,7 @@ BEGIN
             VALUE "FileDescription", "ThruWire" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "ThruWire" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 ThruWire Contributors. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 ANANTHARAJ SEKAR and ThruWire Contributors. All rights reserved." "\0"
             VALUE "OriginalFilename", "ThruWire.exe" "\0"
             VALUE "ProductName", "ThruWire" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

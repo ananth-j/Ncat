@@ -88,7 +88,7 @@ void main() {
         final startCalls = fakeRunner.calls.map((c) => c.toString()).toList();
         expect(
           startCalls.any(
-            (c) => c.contains('screenrecord') && c.contains('/sdcard/wcat_'),
+            (c) => c.contains('screenrecord') && c.contains('/sdcard/thruwire_'),
           ),
           isTrue,
           reason: 'Must spawn screenrecord on device with unique filename',
@@ -144,7 +144,7 @@ void main() {
         expect(
           allCalls.any(
             (c) =>
-                c.contains('pull') && c.contains('/sdcard/wcat_device-rec-1_'),
+                c.contains('pull') && c.contains('/sdcard/thruwire_device-rec-1_'),
           ),
           isTrue,
           reason: 'Stop must pull the recording from device',
@@ -152,7 +152,7 @@ void main() {
         expect(
           allCalls.any(
             (c) =>
-                c.contains('rm -f') && c.contains('/sdcard/wcat_device-rec-1_'),
+                c.contains('rm -f') && c.contains('/sdcard/thruwire_device-rec-1_'),
           ),
           isTrue,
           reason: 'Stop must clean up temporary recording on device',

@@ -125,7 +125,7 @@ void main() {
         reason: 'Must send SIGINT to screenrecord on device during cleanup',
       );
       expect(
-        calls.any((c) => c.contains('rm -f /sdcard/wcat_*.mp4')),
+        calls.any((c) => c.contains('rm -f /sdcard/thruwire_*.mp4')),
         isTrue,
         reason: 'Must clean up temporary recording files',
       );
