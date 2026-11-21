@@ -1,5 +1,5 @@
 ---
-name: ThruWire-architecture
+name: thruwire-architecture
 description: >-
   Architectural guidelines, layer rules, and design patterns for the ThruWire open-source
   project. Use when refactoring, adding new features (screen mirroring, recording,

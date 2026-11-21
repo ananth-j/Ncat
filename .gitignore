@@ -39,4 +39,8 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
+# Internal planning & launch checklists
+OPEN_SOURCE_CHECKLIST.md
+PLAN.md
+
 
