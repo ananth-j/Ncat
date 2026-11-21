@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.44%2B-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.13%2B-0175C2?logo=dart)](https://dart.dev)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-FFDD00?logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/anantharaj)
 
 A modern, performance-first Android companion and `adb logcat` desktop viewer. Built with Flutter and a lightweight Dart bridge server. No Android Studio or heavy IDE required — just `adb`, your device, and `ThruWire`.
 
@@ -35,12 +36,12 @@ Pre-compiled standalone binaries for the latest release are available on [**GitH
 ## ⚡ Highlights
 
 - **Ultra-Low Host Footprint**: Under 2% idle CPU, under 5% during live screen mirroring, and under 100 MB RAM usage.
-- **High-Throughput Logcat**: Virtualized 60 FPS table capable of holding 100,000+ entries with incremental search, regex matching, PID tracking, and StringPool deduplication.
+- **High-Throughput Logcat**: Virtualized 60 FPS table with fixed row extents, incremental search, regex matching, PID tracking, and bounded log buffers (3,000 lines on the bridge and 8,000 lines in the UI).
 - **Hardware-Accelerated Screen Mirroring**: Touch-interactive screen mirror with instant tap, swipe, and key forwarding (< 1ms input latency via persistent shell stdin).
 - **Zero-CPU Scrcpy Fallback**: Launch external hardware-decoded `scrcpy` with a single click.
 - **Native MP4 Screen Recording**: Initiates on-device hardware `screenrecord`, terminates cleanly with `SIGINT` (`pkill -2 screenrecord`) for fully playable MP4 containers, and pulls directly to disk.
 - **One-Click Screenshots**: Captures lossless PNG screenshots from `screencap -p` and triggers native file saving.
-- **Multi-Device Matrix & Tabs**: Connect 2–4 devices simultaneously with per-device tab isolation, side-by-side grid view, and a strict 2-stream concurrency hard cap to prevent host saturation.
+- **Multi-Device Matrix & Tabs**: Connect 2–4 devices simultaneously with per-device tab isolation, side-by-side grid view, and a strict 2-window concurrency hard cap (`kMaxConcurrentScrcpyWindows = 2`) to prevent host saturation.
 - **Security-Hardened**: Loopback-only binding (`127.0.0.1`), Origin header validation against Cross-Site WebSocket Hijacking (CSWSH), device serial whitelisting, and optional token-based authentication.
 
 ---
@@ -53,7 +54,7 @@ Pre-compiled standalone binaries for the latest release are available on [**GitH
 | **Mirroring CPU (15 FPS)** | < 5% | **~3.2%** |
 | **Memory Footprint** | < 100 MB | **~68 MB** |
 | **Input Latency** | < 50 ms | **< 1 ms** (persistent shell stdin) |
-| **Max Concurrent Streams** | 2 Streams | **2 (Hard-Capped)** |
+| **Max Concurrent Mirror Sessions** | 2 Sessions | **2 (Hard-Capped)** |
 
 ---
 
@@ -119,7 +120,7 @@ bin/
 docs/
 ├── ARCHITECTURE.md            # Architectural deep-dive & design patterns
 └── PROTOCOL.md                # WebSocket & HTTP API contract specification
-test/                          # Comprehensive unit & integration test suite (87+ tests)
+test/                          # Comprehensive unit & integration test suite (93+ tests)
 ```
 
 ---
@@ -148,6 +149,28 @@ We welcome community contributions! Please review our [Contributing Guide](CONTR
 - **Found a bug?** Submit an issue on the [Issue Tracker](https://github.com/ananth-j/ThruWire/issues).
 - **Want to request a feature?** Start a discussion or open a [Feature Request](https://github.com/ananth-j/ThruWire/issues/new?template=feature_request.md).
 - **Ready to contribute code?** Fork the repository and open a [Pull Request](https://github.com/ananth-j/ThruWire/pulls).
+
+---
+
+## ☕ Support the Project
+
+If you find ThruWire useful, consider buying a coffee to support its ongoing development:
+
+<p align="left">
+  <a href="https://buymeacoffee.com/anantharaj" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="46" />
+  </a>
+</p>
+
+---
+
+## 👨‍💻 Author & Connect
+
+Created by **Anantharaj Sekar**. Let's connect!
+
+- 💼 **LinkedIn**: [linkedin.com/in/anantharaj-sekar](https://www.linkedin.com/in/anantharaj-sekar)
+- 📸 **Instagram**: [@ananthr4j](https://www.instagram.com/ananthr4j)
+- 🐙 **GitHub**: [@ananth-j](https://github.com/ananth-j)
 
 ---
 

@@ -271,7 +271,8 @@ Stops an in-progress hardware screen recording by sending `SIGINT` (`pkill -2 sc
   - `Content-Disposition: attachment; filename="thruwire_<serial>_<timestamp>.mp4"`
   - Body: Complete MP4 video bytes.
 - **Error Responses**:
-  - `500 Internal Server Error`: No active recording session or failed to pull finalized MP4 file.
+  - `400 Bad Request`: Device serial missing, invalid format, or no active recording session for the specified device.
+  - `500 Internal Server Error`: Failed to pull or finalize MP4 file.
 
 ---
 
@@ -283,19 +284,21 @@ Launches the native `scrcpy` client for the target device. On Windows, ThruWire 
 - **Success Response**: HTTP `200 OK`
   ```json
   {
-    "status": "ok",
+    "status": "launched",
     "serial": "emulator-5554",
-    "mode": "embedded"
+    "pid": 12345
+  }
+  ```
+- **Not Installed Response**: HTTP `200 OK`
+  ```json
+  {
+    "status": "not_installed",
+    "message": "scrcpy is not installed on this system. You can install it automatically in ThruWire."
   }
   ```
 - **Error Responses**:
-  - `500 Internal Server Error`: scrcpy executable not found on host system:
-    ```json
-    {
-      "status": "not_installed",
-      "message": "scrcpy executable not found on system PATH"
-    }
-    ```
+  - `400 Bad Request`: Device serial missing or invalid format.
+  - `500 Internal Server Error`: Process execution failure when launching scrcpy.
 
 ---
 
@@ -321,7 +324,7 @@ Queries the host system to determine if `scrcpy` is available on the `PATH` or i
   {
     "installed": true,
     "path": "C:\\Users\\User\\AppData\\Local\\ThruWire\\tools\\scrcpy\\scrcpy.exe",
-    "version": "v3.1"
+    "version": "v5.0.1"
   }
   ```
 
@@ -335,7 +338,7 @@ Automatically downloads the official pre-built `scrcpy` binary release archive f
   {
     "status": "ok",
     "path": "C:\\Users\\User\\AppData\\Local\\ThruWire\\tools\\scrcpy\\scrcpy.exe",
-    "version": "v3.1"
+    "version": "v5.0.1"
   }
   ```
 
@@ -349,7 +352,13 @@ Injects interactive touch, swipe, key, or text events into the persistent `adb s
   - **Swipe**: `{"action": "swipe", "x1": 540, "y1": 1500, "x2": 540, "y2": 500, "durationMs": 300, "serial": "emulator-5554"}`
   - **Key**: `{"action": "key", "keyCode": 4, "serial": "emulator-5554"}`
   - **Text**: `{"action": "text", "text": "Hello", "serial": "emulator-5554"}`
-- **Success Response**: HTTP `200 OK` (`"OK"`)
+- **Success Response**: HTTP `200 OK`
+  ```json
+  {
+    "status": "ok",
+    "action": "tap"
+  }
+  ```
 
 ---
 

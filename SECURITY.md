@@ -36,7 +36,7 @@ ThruWire interacts with host operating system tools (`adb`, `scrcpy`) to stream 
 The Dart bridge server strictly binds to the IPv4 loopback address (`127.0.0.1`). It refuses connections from external network interfaces (`0.0.0.0`), preventing unauthorized network-adjacent devices from accessing ADB or log streams.
 
 ### 2. Origin Header Validation (CSWSH Protection)
-To protect against **Cross-Site WebSocket Hijacking (CSWSH)** and unauthorized browser-based requests, the server checks the HTTP `Origin:` header on WebSocket upgrade (`/ws`, `/stream`) and HTTP endpoints.
+To protect against **Cross-Site WebSocket Hijacking (CSWSH)** and unauthorized browser-based requests, the server checks the HTTP `Origin:` header on WebSocket upgrade (`/ws`) and HTTP API endpoints.
 Requests originating from external domains (e.g. `https://malicious-website.com`) are immediately rejected with `403 Forbidden`. Only local loopback origins (`localhost`, `127.0.0.1`, `::1`) and native non-browser clients (which omit `Origin`) are accepted.
 
 ### 3. Session Token Authentication
@@ -66,6 +66,6 @@ Text typed into the mirror view is sent to the device shell via `DeviceSession.s
 - All single quotes are escaped with `'\''`, and the final string is single-quoted for POSIX shell execution.
 
 ### 6. Resource Limits & Denial-of-Service Defenses
-- Hard cap of 2 concurrent real-time video streams (`kMaxConcurrentStreams = 2`) to protect host CPU and device battery.
-- Logcat ring buffer is capped at 100,000 entries with automatic FIFO pruning and StringPool deduplication to prevent out-of-memory crashes.
+- Hard cap of 2 concurrent scrcpy mirror sessions (`kMaxConcurrentScrcpyWindows = 2`) to protect host CPU and device battery.
+- Logcat buffers are strictly bounded (3,000 lines on bridge server, 8,000 lines on frontend) with automatic FIFO pruning and incremental query evaluation to prevent out-of-memory issues.
 - Disconnected devices immediately trigger `DeviceSession.dispose()`, cleanly shutting down child ADB and shell processes.

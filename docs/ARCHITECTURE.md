@@ -17,14 +17,14 @@ flowchart TD
 
     subgraph Bridge["Dart Bridge Server (127.0.0.1:8080)"]
         WS["WebSocket /ws (Flushed batches / 100ms)"]
-        HTTP["HTTP API (/api/screenshot, /api/record, /api/scrcpy, /api/input)"]
+        HTTP["HTTP API (/api/screenshot, /api/record/*, /api/scrcpy/*, /api/input)"]
         DS["DeviceSession (Per-Device Serial Isolation)"]
         TR["AdbTracker (track-devices Push Stream)"]
         SR["ScrcpyResolver (Auto Discovery & Bootstrapping)"]
     end
 
     subgraph Hardware["Android Device / Emulator"]
-        LOGCAT["adb logcat -v epoch"]
+        LOGCAT["adb logcat -v threadtime"]
         SHELL["adb shell (Persistent stdin < 1ms)"]
         REC["screenrecord (Hardware H.264 + SIGINT)"]
         CAP["screencap -p (Lossless PNG)"]
@@ -64,8 +64,8 @@ flowchart TD
 │                                                        │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │         DeviceSession (Per-Device Serial)        │  │
-│  │  - Isolated ring buffer (100,000 lines)          │  │
-│  │  - Dedicated `adb logcat -v epoch` process       │  │
+│  │  - Isolated ring buffer (3,000 lines bridge)     │  │
+│  │  - Dedicated `adb logcat -v threadtime` process  │  │
 │  │  - Persistent `adb shell` for < 1ms input        │  │
 │  │  - Native `screenrecord` with SIGINT finalizer   │  │
 │  │  - On-demand single screenshots                  │  │
@@ -110,9 +110,9 @@ All device state is encapsulated in `DeviceSession`:
 ## 3. Layer Breakdown
 
 ### 3.1 Presentation Layer (`lib/features/`)
-- **`logcat/`**: Virtualized, high-throughput log viewer (`LogTableView`, `LogRow`). Built with custom viewport renderers to handle 100,000+ lines at 60 FPS without memory bloat. Includes `TopFilterBar`, `ColumnConfigDialog`, `PresetsDialog`, and `LeftVerticalToolbar`.
+- **`logcat/`**: Virtualized, high-throughput log viewer (`LogTableView`, `LogRow`). Built with fixed row extents and incremental batch filtering to handle high-throughput streaming (up to 8,000 lines in the UI buffer) at 60 FPS without memory bloat. Includes `TopFilterBar`, `ColumnConfigDialog`, `PresetsDialog`, and `LeftVerticalToolbar`.
 - **`mirroring/`**: Touch-interactive screen canvas (`ScreenMirrorView`), screenshot preview dialog (`ScreenshotDialog`), and automated scrcpy installation sheet (`ScrcpyInstallDialog`). Embeds native window on Windows via Windows runner MethodChannel.
-- **`devices/`**: Multi-device tab bar (`DeviceTabBar`) and multi-screen grid layout (`MultiScreenGrid`) enforcing the 2-stream concurrency hard cap (`kMaxConcurrentStreams = 2`).
+- **`devices/`**: Multi-device tab bar (`DeviceTabBar`) and multi-screen grid layout (`MultiScreenGrid`) enforcing the 2-window concurrency hard cap (`kMaxConcurrentScrcpyWindows = 2`).
 
 ### 3.2 State & Controller Layer
 - **`LogcatController`**: Manages view state, search queries, severity filters, column configuration, and per-device tab state (`DeviceTabState`). When the app is minimized or hidden, it enters **Background Mode**, buffering logs in memory without rebuilding the UI widget tree.
@@ -136,7 +136,7 @@ All device state is encapsulated in `DeviceSession`:
 |---|---|
 | **< 2% Idle CPU** | Push-based `track-devices`, periodic flush timer (100ms), no busy loops or polling. |
 | **Low mirror overhead** | Video is encoded on-device and decoded by scrcpy; the bridge does not capture or decode a frame loop. |
-| **< 100MB RAM** | Global `StringPool` deduplicates repeated log tags and package strings. Inverted index for O(1) incremental filter evaluation. |
+| **< 100MB RAM** | Strict buffer bounds (`kHistorySize = 3000` on bridge, `kMaxLines = 8000` on frontend). Incremental batch filter evaluation only on newly arrived lines via `LogQuery`. |
 | **Multi-Device Hard Cap** | Strict 2-session scrcpy cap. Other grid tiles display static screenshot thumbnails. |
 
 ---
