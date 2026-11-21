@@ -13,11 +13,9 @@ Android device(s) ───adb───▶ ThruWire bridge (127.0.0.1:8080) ─�
 ```
 
 <p align="center">
-  <img src="docs/screenshots/screen_shot.png" alt="ThruWire Desktop UI — Logcat + Screen Mirror" width="100%" />
+  <img src="docs/screenshots/screen_shot.webp" alt="ThruWire Desktop UI — Logcat + Screen Mirror" width="100%" />
 </p>
-<p align="center">
-  <img src="docs/screenshots/Screenshot-2.png" alt="ThruWire Desktop UI — Logcat View" width="100%" />
-</p>
+
 
 ---
 
