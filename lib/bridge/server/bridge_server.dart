@@ -617,23 +617,20 @@ class LogcatBridgeServer {
     }
 
     try {
-      final res = await processRunner.run(adbPath, [
-        '-s',
-        serial,
-        'exec-out',
-        'screencap',
-        '-p',
-      ], stdoutEncoding: null);
-      if (res.exitCode != 0) {
+      // Delegate to DeviceSession which handles Windows exec-out CRLF corruption
+      // via a PNG-validated fast path with a pull-based fallback.
+      final session = _getOrCreateSession(serial);
+      final bytes = await session.takeScreenshot();
+      if (bytes == null) {
         req.response
           ..statusCode = HttpStatus.internalServerError
-          ..write('screencap failed with exit code ${res.exitCode}');
+          ..write('screencap failed: no PNG data returned from device');
         await req.response.close();
         return;
       }
 
       req.response.headers.contentType = ContentType('image', 'png');
-      req.response.add(res.stdout as List<int>);
+      req.response.add(bytes);
       await req.response.close();
     } catch (e) {
       req.response

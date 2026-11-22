@@ -439,9 +439,14 @@ class DeviceSession {
     return null;
   }
 
-  /// Takes an instant screenshot from the device using adb exec-out screencap -p.
+  /// Takes an instant screenshot from the device.
+  ///
+  /// On Windows, [adb exec-out] corrupts binary data with CRLF translation,
+  /// so we fall back to writing to a temp file on the device and pulling it.
   Future<Uint8List?> takeScreenshot() async {
     if (_isDisposed) return null;
+
+    // Try exec-out first (fast path, works on macOS/Linux and most Windows builds)
     try {
       final res = await processRunner.run(adbPath, [
         '-s',
@@ -451,11 +456,70 @@ class DeviceSession {
         '-p',
       ], stdoutEncoding: null);
       if (res.exitCode == 0 && res.stdout is List<int>) {
-        return Uint8List.fromList(res.stdout as List<int>);
+        final bytes = Uint8List.fromList(res.stdout as List<int>);
+        // Validate PNG magic bytes (137 P N G \r \n 26 \n)
+        if (_isPng(bytes)) return bytes;
       }
     } catch (_) {}
+
+    // Fallback: write PNG to /sdcard/tmp, pull, delete (safe on Windows exec-out)
+    final sanitizedSerial = serial.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    final remotePath =
+        '/sdcard/thruwire_sc_${sanitizedSerial}_${DateTime.now().millisecondsSinceEpoch}.png';
+    try {
+      final captureResult = await processRunner.run(adbPath, [
+        '-s',
+        serial,
+        'shell',
+        'screencap',
+        '-p',
+        remotePath,
+      ]);
+      if (captureResult.exitCode != 0) return null;
+
+      final localTemp =
+          '${Directory.systemTemp.path}/thruwire_sc_${DateTime.now().millisecondsSinceEpoch}.png';
+      final pullResult = await processRunner.run(adbPath, [
+        '-s',
+        serial,
+        'pull',
+        remotePath,
+        localTemp,
+      ]);
+
+      // Always clean up the remote temp file
+      await processRunner.run(adbPath, [
+        '-s',
+        serial,
+        'shell',
+        'rm',
+        '-f',
+        remotePath,
+      ]);
+
+      if (pullResult.exitCode != 0) return null;
+
+      final file = File(localTemp);
+      if (await file.exists()) {
+        final bytes = await file.readAsBytes();
+        try {
+          await file.delete();
+        } catch (_) {}
+        if (_isPng(bytes)) return bytes;
+      }
+    } catch (e) {
+      _system('Screenshot fallback failed: $e');
+    }
     return null;
   }
+
+  /// Returns true if [bytes] starts with the PNG magic signature.
+  static bool _isPng(Uint8List bytes) =>
+      bytes.length > 8 &&
+      bytes[0] == 0x89 &&
+      bytes[1] == 0x50 && // P
+      bytes[2] == 0x4E && // N
+      bytes[3] == 0x47;   // G
 
   Future<void> _ensureInputShell() async {
     if (_isDisposed) return;
