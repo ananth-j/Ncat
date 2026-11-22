@@ -310,19 +310,35 @@ class DeviceSession {
   DateTime? _recordingStartedAt;
   Timer? _recordLimitTimer;
 
-  DateTime? get recordingStartedAt => _recordingStartedAt;
+  /// True when the recording is being done via scrcpy instead of screenrecord.
+  bool _usingScrcpyRecord = false;
 
-  /// Starts native screen recording on the device without host-side transcoding.
+  /// Local MP4 path when scrcpy --record is used (output goes directly to host).
+  String? _scrcpyLocalRecordPath;
+  String? _recordingStartError;
+
+  DateTime? get recordingStartedAt => _recordingStartedAt;
+  String? get recordingStartError => _recordingStartError;
+
+  /// Starts screen recording. First tries the native Android [screenrecord] command.
+  /// If the process crashes within 2 seconds (common on Realme/OPPO Android 14 devices
+  /// where the screenrecord binary segfaults), automatically retries using
+  /// [scrcpy --no-display --record], which uses a different capture path.
   Future<bool> startRecording({int bitRate = 6000000}) async {
     if (_isDisposed || _recordProcess != null) return false;
+
+    _recordingStartError = null;
 
     await killOrphans();
 
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final sanitizedSerial = serial.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+
+    // --- Attempt 1: native screenrecord on device ---
     final remotePath = '/sdcard/thruwire_${sanitizedSerial}_$timestamp.mp4';
     _currentRecordingDevicePath = remotePath;
-    _recordingStartedAt = DateTime.now();
+    _usingScrcpyRecord = false;
+    _scrcpyLocalRecordPath = null;
 
     try {
       final p = await processRunner.start(adbPath, [
@@ -334,55 +350,185 @@ class DeviceSession {
         bitRate.toString(),
         remotePath,
       ]);
-      _recordProcess = p;
-      _system('Recording started ($remotePath)');
 
-      // Handle the 3-minute hard limit of Android screenrecord (180s)
-      _recordLimitTimer?.cancel();
-      _recordLimitTimer = Timer(const Duration(seconds: 175), () {
-        _system('Recording approaching 3-minute limit (175s elapsed)');
-      });
+      // Give the process 1.5 s to prove it's alive (segfaulting processes exit instantly)
+      final exitCode = await _processExitCodeWithin(
+        p,
+        const Duration(milliseconds: 1500),
+      );
+
+      if (exitCode == null) {
+        _recordProcess = p;
+        _recordingStartedAt = DateTime.now();
+        _system('Recording started via screenrecord ($remotePath)');
+
+        // Handle the 3-minute hard limit of Android screenrecord (180s)
+        _recordLimitTimer?.cancel();
+        _recordLimitTimer = Timer(const Duration(seconds: 175), () {
+          _system('Recording approaching 3-minute limit (175s elapsed)');
+        });
+
+        unawaited(
+          p.exitCode.then((code) {
+            if (_recordProcess == p) _recordProcess = null;
+            _recordLimitTimer?.cancel();
+          }),
+        );
+        return true;
+      }
+
+      // screenrecord crashed early — try to kill it cleanly
+      try { p.kill(); } catch (_) {}
+      _recordingStartError = 'Android screenrecord exited with code $exitCode.';
+      _system('screenrecord exited with code $exitCode — retrying with scrcpy --record');
+    } catch (e) {
+      _recordingStartError = 'Could not launch Android screenrecord: $e';
+      _system('screenrecord failed to start: $e — retrying with scrcpy --record');
+    }
+
+    // Clean up stale remote file from the failed attempt
+    _currentRecordingDevicePath = null;
+    try {
+      await processRunner.run(adbPath, ['-s', serial, 'shell', 'rm', '-f', remotePath]);
+    } catch (_) {}
+
+    // --- Attempt 2: scrcpy --no-display --record (bypasses screenrecord binary) ---
+    return _startScrcpyRecord(sanitizedSerial, timestamp, bitRate);
+  }
+
+  /// Falls back to recording via [scrcpy --no-display --record].
+  /// The MP4 is written directly to the host's temp directory.
+  Future<bool> _startScrcpyRecord(
+    String sanitizedSerial,
+    int timestamp,
+    int bitRate,
+  ) async {
+    final scrcpyExe = ScrcpyResolver.findScrcpyExecutable();
+    if (scrcpyExe == null) {
+      _recordingStartError = '${_recordingStartError ?? 'Android screenrecord failed.'} '
+          'scrcpy is not installed; install it from the mirror pane to enable the fallback.';
+      _system(_recordingStartError!);
+      return false;
+    }
+
+    final localPath =
+        '${Directory.systemTemp.path}${Platform.pathSeparator}'
+        'thruwire_${sanitizedSerial}_$timestamp.mp4';
+
+    try {
+      final p = await processRunner.start(scrcpyExe, [
+        '-s',
+        serial,
+        '--no-display',
+        '--record',
+        localPath,
+        '--video-bit-rate',
+        '${(bitRate / 1000000).round()}M',
+      ]);
+
+      // scrcpy takes ~1 s to initialise; wait up to 3 s for it to stabilise
+      final exitCode = await _processExitCodeWithin(p, const Duration(seconds: 3));
+      if (exitCode != null) {
+        try { p.kill(); } catch (_) {}
+        _recordingStartError = 'scrcpy exited with code $exitCode while starting.';
+        _system(_recordingStartError!);
+        return false;
+      }
+
+      _recordProcess = p;
+      _recordingStartedAt = DateTime.now();
+      _usingScrcpyRecord = true;
+      _scrcpyLocalRecordPath = localPath;
+      _system('Recording started via scrcpy --record ($localPath)');
 
       unawaited(
         p.exitCode.then((code) {
-          if (_recordProcess == p) {
-            _recordProcess = null;
-          }
+          if (_recordProcess == p) _recordProcess = null;
           _recordLimitTimer?.cancel();
         }),
       );
-
       return true;
     } catch (e) {
-      _system('Failed to start recording: $e');
-      _currentRecordingDevicePath = null;
-      _recordingStartedAt = null;
+      _recordingStartError = 'Could not launch scrcpy recording: $e';
+      _system('scrcpy --record failed: $e');
       return false;
     }
   }
 
-  /// Stops screen recording by sending SIGINT on the device, waits for exit so the MP4 moov
-  /// atom is properly finalized, pulls the file to the host, and cleans up remote temp files.
+  /// Waits up to [timeout] for [process] to exit.
+  /// Returns true if it exited (crashed), false if it is still running.
+  Future<int?> _processExitCodeWithin(Process process, Duration timeout) async {
+    try {
+      return await process.exitCode.timeout(timeout);
+    } on TimeoutException {
+      return null; // still running → good
+    }
+  }
+
+  /// Stops screen recording, finalises the MP4, pulls it to the host (for the
+  /// native screenrecord path), and returns the raw MP4 bytes.
   Future<List<int>?> stopRecording() async {
     final p = _recordProcess;
     final remotePath = _currentRecordingDevicePath;
+    final localPath = _scrcpyLocalRecordPath;
+    final usingScrcpy = _usingScrcpyRecord;
+
     _recordLimitTimer?.cancel();
     _recordingStartedAt = null;
+    _usingScrcpyRecord = false;
+    _scrcpyLocalRecordPath = null;
 
+    if (usingScrcpy) {
+      // scrcpy records directly to [localPath] on the host.
+      // Kill scrcpy gracefully so it finalises the MP4 moov atom.
+      if (p != null) {
+        try { p.kill(ProcessSignal.sigint); } catch (_) {
+          try { p.kill(); } catch (_) {}
+        }
+        try {
+          await p.exitCode.timeout(const Duration(seconds: 8));
+        } catch (_) {
+          try { p.kill(); } catch (_) {}
+        }
+      }
+      _recordProcess = null;
+      _currentRecordingDevicePath = null;
+
+      if (localPath == null) return null;
+
+      // Give scrcpy a moment to flush and close the file
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      final file = File(localPath);
+      if (await file.exists()) {
+        final bytes = await file.readAsBytes();
+        try { await file.delete(); } catch (_) {}
+        _system('Recording finalised via scrcpy (${bytes.length} bytes)');
+        return bytes;
+      }
+      _system('scrcpy recording file not found at $localPath');
+      return null;
+    }
+
+    // --- native screenrecord path ---
     if (remotePath == null) return null;
 
     try {
-      // 1. Send SIGINT on the device to gracefully terminate screenrecord so MP4 header is written
-      await processRunner.run(adbPath, [
-        '-s',
-        serial,
-        'shell',
-        'pkill',
-        '-2',
-        'screenrecord',
+      // 1. Send SIGINT on the device to gracefully terminate screenrecord
+      //    so the MP4 moov atom is properly written.
+      //    If pkill is not permitted, kill the adb shell process directly.
+      final pkillResult = await processRunner.run(adbPath, [
+        '-s', serial, 'shell', 'pkill', '-2', 'screenrecord',
       ]);
 
-      // 2. Wait for process exit with 6 second timeout
+      if (pkillResult.exitCode != 0) {
+        // pkill not permitted on this device — kill via the adb shell process
+        try { p?.kill(ProcessSignal.sigint); } catch (_) {
+          try { p?.kill(); } catch (_) {}
+        }
+      }
+
+      // 2. Wait for the process to exit (up to 6 s)
       if (p != null) {
         try {
           await p.exitCode.timeout(const Duration(seconds: 6));
@@ -392,28 +538,19 @@ class DeviceSession {
       }
       _recordProcess = null;
 
-      // Small delay to ensure Android filesystem syncs file before pull
+      // Small delay to ensure Android filesystem syncs the file before pull
       await Future<void>.delayed(const Duration(milliseconds: 200));
 
-      // 3. Pull file to local temp
+      // 3. Pull MP4 to a local temp file
       final localTemp =
           '${Directory.systemTemp.path}/thruwire_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final pullResult = await processRunner.run(adbPath, [
-        '-s',
-        serial,
-        'pull',
-        remotePath,
-        localTemp,
+        '-s', serial, 'pull', remotePath, localTemp,
       ]);
 
-      // 4. Delete temp file on Android device
+      // 4. Delete the temp file from the device regardless of pull outcome
       await processRunner.run(adbPath, [
-        '-s',
-        serial,
-        'shell',
-        'rm',
-        '-f',
-        remotePath,
+        '-s', serial, 'shell', 'rm', '-f', remotePath,
       ]);
       _currentRecordingDevicePath = null;
 
@@ -425,12 +562,8 @@ class DeviceSession {
       final file = File(localTemp);
       if (await file.exists()) {
         final bytes = await file.readAsBytes();
-        try {
-          await file.delete();
-        } catch (_) {}
-        _system(
-          'Recording successfully pulled and finalized (${bytes.length} bytes)',
-        );
+        try { await file.delete(); } catch (_) {}
+        _system('Recording successfully pulled and finalised (${bytes.length} bytes)');
         return bytes;
       }
     } catch (e) {

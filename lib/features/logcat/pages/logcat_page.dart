@@ -148,11 +148,15 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
       }
     } else {
       _notify('Starting screen recording on device...');
-      final started = await _captureService.startRecording(serial: serial);
-      if (started) {
-        _notify('● Recording in progress (hardware-encoded)');
-      } else {
-        _notify('Failed to start recording on device', isError: true);
+      try {
+        final started = await _captureService.startRecording(serial: serial);
+        if (started) {
+          _notify('● Recording in progress (hardware-encoded)');
+        } else {
+          _notify('Failed to start recording on device', isError: true);
+        }
+      } catch (e) {
+        _notify('Start recording failed: $e', isError: true);
       }
     }
   }

@@ -676,7 +676,8 @@ class LogcatBridgeServer {
       req.response.write(
         jsonEncode({
           'status': 'error',
-          'message': 'Failed to start screenrecord process',
+          'message': session.recordingStartError ??
+              'Recording could not start. Check that the device is connected and screenrecord is available.',
         }),
       );
     }
