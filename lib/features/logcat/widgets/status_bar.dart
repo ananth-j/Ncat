@@ -16,6 +16,8 @@ class LogcatStatusBar extends StatelessWidget {
     required this.autoScroll,
     required this.visibleCount,
     required this.totalCount,
+    this.hiddenNoiseCount = 0,
+    this.reduceNoise = false,
   });
 
   final String connection;
@@ -27,6 +29,8 @@ class LogcatStatusBar extends StatelessWidget {
   final bool autoScroll;
   final int visibleCount;
   final int totalCount;
+  final int hiddenNoiseCount;
+  final bool reduceNoise;
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +128,12 @@ class LogcatStatusBar extends StatelessWidget {
             ),
             const SizedBox(width: 10),
           ],
-          Text('$visibleCount of $totalCount lines', style: textStyle),
+          Text(
+            (reduceNoise && hiddenNoiseCount > 0)
+                ? '$visibleCount of $totalCount lines ($hiddenNoiseCount noise hidden)'
+                : '$visibleCount of $totalCount lines',
+            style: textStyle,
+          ),
         ],
       ),
     );

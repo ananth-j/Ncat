@@ -16,10 +16,12 @@ import '../devices/device_controller.dart';
 import '../devices/models/device_info.dart';
 import 'models/log_entry.dart';
 import 'models/log_query.dart';
+import 'models/noise_filter.dart';
 
-// Re-export device domain models for backward compatibility
+// Re-export device and noise models for backward compatibility
 export '../devices/device_controller.dart'
     show DeviceViewMode, DeviceTabState, DeviceController;
+export 'models/noise_filter.dart' show NoiseFilterMode, NoiseFilter;
 
 /// Central state controller for logcat streaming, filtering, presets, and export.
 class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
@@ -75,6 +77,8 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   bool _wrap = true;
   bool _autoScroll = true;
   bool _useRegex = false;
+  NoiseFilterMode _noiseMode = NoiseFilterMode.reduce;
+  int _hiddenNoiseCount = 0;
 
   // Background mode tracking (Phase 2.4)
   bool _isAppActive = true;
@@ -106,6 +110,9 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   bool get wrap => _wrap;
   bool get autoScroll => _autoScroll;
   bool get useRegex => _useRegex;
+  NoiseFilterMode get noiseMode => _noiseMode;
+  bool get reduceNoise => _noiseMode == NoiseFilterMode.reduce;
+  int get hiddenNoiseCount => _hiddenNoiseCount;
   LogColumnConfig get columns => _columns;
 
   void init() {
@@ -316,6 +323,25 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
         // Phase 2.2: Incremental filtering - test ONLY newly arrived lines
         final passing = lines.where(_matchesFilter).toList(growable: false);
+        if (_noiseMode == NoiseFilterMode.reduce) {
+          final currentPkg = pkgController.text.trim();
+          for (final l in lines) {
+            if (!_matchesFilter(l) &&
+                NoiseFilter.isNoise(
+                  l,
+                  appPid: _appPid,
+                  packageFilter: currentPkg,
+                )) {
+              _hiddenNoiseCount++;
+            }
+          }
+          if (excess > 0 && _hiddenNoiseCount > _lines.length) {
+            _hiddenNoiseCount = (_lines.length - _visible.length).clamp(
+              0,
+              _lines.length,
+            );
+          }
+        }
         if (passing.isNotEmpty) {
           if (excess > 0 && _visible.isNotEmpty) {
             final minSeq = _lines.first.seq;
@@ -360,6 +386,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
         }
         if (targetSerial == null || targetSerial == activeDevice) {
           _lines.clear();
+          _hiddenNoiseCount = 0;
           _recompute();
         }
         break;
@@ -400,6 +427,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       currentTab.useRegex = _useRegex;
       currentTab.autoScroll = _autoScroll;
       currentTab.paused = _paused;
+      currentTab.noiseMode = _noiseMode;
     }
 
     // 2. Switch to target device tab
@@ -413,6 +441,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     _useRegex = tab.useRegex;
     _autoScroll = tab.autoScroll;
     _paused = tab.paused;
+    _noiseMode = tab.noiseMode;
 
     _updateFilterCache();
     _lines
@@ -447,6 +476,21 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
   bool _matchesFilter(LogEntry e) {
     if (e.rank < _cachedMinRank) return false;
+
+    final isNoise = NoiseFilter.isNoise(
+      e,
+      appPid: _appPid,
+      packageFilter: pkgController.text.trim(),
+    );
+
+    if (!_cachedQuery.hasNoiseTerm) {
+      if (_noiseMode == NoiseFilterMode.reduce && isNoise) {
+        return false;
+      } else if (_noiseMode == NoiseFilterMode.onlyNoise && !isNoise) {
+        return false;
+      }
+    }
+
     for (final term in _cachedQuery.terms) {
       final field = term.field;
       final matched = switch (field) {
@@ -459,6 +503,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
           e.pkg ?? (_appPid == e.pid ? pkgController.text.trim() : '${e.pid}'),
         ),
         'level' => _matchesLevelTerm(e, term.value, term.negated),
+        'is' => term.matches(isNoise ? 'noise' : 'clean'),
         _ => term.matches('${e.tag} ${e.msg}'),
       };
       if (!matched) return false;
@@ -482,15 +527,40 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
   void _recompute() {
     _updateFilterCache();
-    _visible
-      ..clear()
-      ..addAll(_lines.where(_matchesFilter));
+    _visible.clear();
+    int hidden = 0;
+    final isReduced = _noiseMode == NoiseFilterMode.reduce;
+    final currentPkg = pkgController.text.trim();
+
+    for (final e in _lines) {
+      if (_matchesFilter(e)) {
+        _visible.add(e);
+      } else if (isReduced &&
+          NoiseFilter.isNoise(e, appPid: _appPid, packageFilter: currentPkg)) {
+        hidden++;
+      }
+    }
+    _hiddenNoiseCount = hidden;
     // Publish a new list reference so visibleNotifier listeners rebuild.
     visibleNotifier.value = List<LogEntry>.unmodifiable(_visible);
     notifyListeners();
   }
 
   // User Actions
+  void setNoiseMode(NoiseFilterMode mode) {
+    if (_noiseMode == mode) return;
+    _noiseMode = mode;
+    _recompute();
+  }
+
+  void toggleReduceNoise() {
+    setNoiseMode(
+      _noiseMode == NoiseFilterMode.reduce
+          ? NoiseFilterMode.showAll
+          : NoiseFilterMode.reduce,
+    );
+  }
+
   void setSearch(String v, {bool immediate = true}) {
     _search = v;
     if (immediate) {

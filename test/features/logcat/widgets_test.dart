@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thruwire/features/devices/models/device_info.dart';
 import 'package:thruwire/features/logcat/models/log_entry.dart';
+import 'package:thruwire/features/logcat/models/noise_filter.dart';
 import 'package:thruwire/features/logcat/widgets/left_vertical_toolbar.dart';
 import 'package:thruwire/features/logcat/widgets/log_row.dart';
 import 'package:thruwire/features/logcat/widgets/status_bar.dart';
@@ -66,6 +67,55 @@ void main() {
       // Enter search text
       await tester.enterText(find.byType(TextField).last, 'my query');
       expect(searchVal, 'my query');
+
+      searchCtrl.dispose();
+      pkgCtrl.dispose();
+    });
+
+    testWidgets('renders noise reduction control and handles mode change', (
+      tester,
+    ) async {
+      setDesktopSize(tester);
+
+      NoiseFilterMode selectedMode = NoiseFilterMode.reduce;
+      final searchCtrl = TextEditingController();
+      final pkgCtrl = TextEditingController();
+
+      await tester.pumpWidget(
+        wrapWithTheme(
+          TopFilterBar(
+            searchCtrl: searchCtrl,
+            pkgCtrl: pkgCtrl,
+            minLevel: 'V',
+            useRegex: false,
+            appPid: null,
+            devices: const [],
+            pickedDevice: null,
+            noiseMode: NoiseFilterMode.reduce,
+            onSearch: (_) {},
+            onLevel: (_) {},
+            onPackage: () {},
+            onRegex: () {},
+            onDevice: (_) {},
+            onNoiseMode: (mode) => selectedMode = mode,
+          ),
+        ),
+      );
+
+      expect(find.text('Noise: Reduced'), findsOneWidget);
+
+      // Open noise popup menu
+      await tester.tap(find.text('Noise: Reduced'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Show All (Include Noise)'), findsOneWidget);
+      expect(find.text('Only Noise'), findsOneWidget);
+
+      // Select Show All
+      await tester.tap(find.text('Show All (Include Noise)'));
+      await tester.pumpAndSettle();
+
+      expect(selectedMode, NoiseFilterMode.showAll);
 
       searchCtrl.dispose();
       pkgCtrl.dispose();
@@ -143,6 +193,32 @@ void main() {
       expect(find.text('PAUSED'), findsOneWidget);
       expect(find.text('SCROLL PAUSED'), findsOneWidget);
       expect(find.text('42 of 100 lines'), findsOneWidget);
+    });
+
+    testWidgets('displays noise hidden count when noise reduction is active', (
+      tester,
+    ) async {
+      setDesktopSize(tester);
+
+      await tester.pumpWidget(
+        wrapWithTheme(
+          const LogcatStatusBar(
+            connection: 'live',
+            serverStatus: 'streaming logcat',
+            activeDevice: 'DEV123',
+            devices: [DeviceInfo(serial: 'DEV123', model: 'Galaxy S24')],
+            appPid: null,
+            paused: false,
+            autoScroll: true,
+            visibleCount: 42,
+            totalCount: 100,
+            hiddenNoiseCount: 58,
+            reduceNoise: true,
+          ),
+        ),
+      );
+
+      expect(find.text('42 of 100 lines (58 noise hidden)'), findsOneWidget);
     });
   });
 

@@ -193,6 +193,8 @@ void main() {
     test(
       'INCREMENTAL FILTER (T.5c): Appending batch to active filter completes fast',
       () {
+        controller.setNoiseMode(NoiseFilterMode.showAll);
+
         // 1. Populate initial 8,000 lines with an active filter
         final fullBuffer = generateBatch(kMaxLines, 0);
         controller.handleMessage(HistoryMessage(fullBuffer));

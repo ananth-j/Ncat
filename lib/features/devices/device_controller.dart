@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../logcat/models/log_entry.dart';
+import '../logcat/models/noise_filter.dart';
 import 'models/device_info.dart';
 
 /// View display modes for multi-device workflows.
@@ -19,6 +20,7 @@ class DeviceTabState {
   bool useRegex = false;
   bool autoScroll = true;
   bool paused = false;
+  NoiseFilterMode noiseMode = NoiseFilterMode.reduce;
   int? appPid;
 }
 

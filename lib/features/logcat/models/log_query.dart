@@ -11,6 +11,10 @@ class LogQuery {
   final List<LogQueryTerm> terms;
 
   bool get isEmpty => terms.isEmpty;
+
+  /// Whether the query explicitly checks for noise status (e.g. `is:noise` or `-is:noise`).
+  bool get hasNoiseTerm =>
+      terms.any((t) => t.field == 'is' && t.value.toLowerCase() == 'noise');
 }
 
 class LogQueryTerm {
@@ -58,9 +62,14 @@ List<LogQueryTerm> _parseTerms(String source, bool useRegex) {
         fieldText = fieldText.substring(0, fieldText.length - 1);
         regex = true;
       }
-      if (const {'tag', 'package', 'process', 'message', 'level'}.contains(
-        fieldText,
-      )) {
+      if (const {
+        'tag',
+        'package',
+        'process',
+        'message',
+        'level',
+        'is',
+      }.contains(fieldText)) {
         field = fieldText;
         token = token.substring(separator + 1);
       }

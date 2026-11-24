@@ -266,4 +266,113 @@ void main() {
       expect(exportString, isNotNull);
     });
   });
+
+  group('LogcatController Noise Reduction & Mode Selection', () {
+    test('NoiseFilter identifies system chatter vs real app logs', () {
+      final sfEntry = createEntry(1, 'D', 'SurfaceFlinger', 'vsync tick');
+      final wifiEntry = createEntry(2, 'I', 'WifiService', 'Scan completed');
+      final appEntry = createEntry(3, 'D', 'MainActivity', 'User clicked login');
+      final errEntry = createEntry(
+        4,
+        'E',
+        'SurfaceFlinger',
+        'Composition failed fatally',
+      );
+      final chattyEntry = createEntry(
+        5,
+        'I',
+        'chatty',
+        'uid=1000 expire 5 lines',
+      );
+
+      // System daemon logs at low rank are noise
+      expect(NoiseFilter.isNoise(sfEntry), isTrue);
+      expect(NoiseFilter.isNoise(wifiEntry), isTrue);
+      expect(NoiseFilter.isNoise(chattyEntry), isTrue);
+
+      // App logs are not noise
+      expect(NoiseFilter.isNoise(appEntry), isFalse);
+
+      // Errors are NEVER noise even from system daemons
+      expect(NoiseFilter.isNoise(errEntry), isFalse);
+
+      // App logs matching active appPid are never noise
+      final daemonBelongingToApp = createEntry(
+        6,
+        'D',
+        'SurfaceFlinger',
+        'Local render',
+        pid: 999,
+      );
+      expect(NoiseFilter.isNoise(daemonBelongingToApp, appPid: 999), isFalse);
+    });
+
+    test('LogcatController reduces noise by default and toggles cleanly', () {
+      expect(controller.noiseMode, NoiseFilterMode.reduce);
+      expect(controller.reduceNoise, isTrue);
+
+      final mixedEntries = [
+        createEntry(1, 'I', 'MainActivity', 'Starting user activity'),
+        createEntry(2, 'D', 'SurfaceFlinger', 'Buffer swap 16ms'),
+        createEntry(3, 'D', 'WifiService', 'Periodic RSSI poll'),
+        createEntry(4, 'E', 'AudioFlinger', 'Audio track underrun error'),
+        createEntry(5, 'D', 'PaymentService', 'Payment processed'),
+      ];
+
+      controller.handleMessage(HistoryMessage(mixedEntries));
+
+      // With reduceNoise (default):
+      // SurfaceFlinger (D) and WifiService (D) are suppressed.
+      // MainActivity (I), PaymentService (D), and AudioFlinger (E error!) remain visible.
+      expect(controller.lines.length, 5);
+      expect(controller.visible.length, 3);
+      expect(controller.hiddenNoiseCount, 2);
+      expect(
+        controller.visible.map((e) => e.tag),
+        containsAllInOrder(['MainActivity', 'AudioFlinger', 'PaymentService']),
+      );
+
+      // Switch to Show All: all 5 lines are visible
+      controller.setNoiseMode(NoiseFilterMode.showAll);
+      expect(controller.noiseMode, NoiseFilterMode.showAll);
+      expect(controller.reduceNoise, isFalse);
+      expect(controller.visible.length, 5);
+
+      // Switch to Only Noise: only the 2 noise lines are visible
+      controller.setNoiseMode(NoiseFilterMode.onlyNoise);
+      expect(controller.noiseMode, NoiseFilterMode.onlyNoise);
+      expect(controller.visible.length, 2);
+      expect(
+        controller.visible.map((e) => e.tag),
+        containsAllInOrder(['SurfaceFlinger', 'WifiService']),
+      );
+
+      // Toggle back to reduce
+      controller.toggleReduceNoise();
+      expect(controller.noiseMode, NoiseFilterMode.reduce);
+      expect(controller.visible.length, 3);
+    });
+
+    test('LogcatController supports is:noise and -is:noise in search query', () {
+      final mixedEntries = [
+        createEntry(1, 'I', 'AppController', 'Ready'),
+        createEntry(2, 'D', 'SurfaceFlinger', 'Frame flip'),
+        createEntry(3, 'D', 'WifiService', 'Ping probe'),
+      ];
+      controller.handleMessage(HistoryMessage(mixedEntries));
+
+      // Querying is:noise explicitly shows noise lines
+      controller.setSearch('is:noise');
+      expect(controller.visible.length, 2);
+      expect(
+        controller.visible.map((e) => e.tag),
+        containsAll(['SurfaceFlinger', 'WifiService']),
+      );
+
+      // Querying -is:noise explicitly shows only non-noise lines
+      controller.setSearch('-is:noise');
+      expect(controller.visible.length, 1);
+      expect(controller.visible.first.tag, 'AppController');
+    });
+  });
 }

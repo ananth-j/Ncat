@@ -4,6 +4,7 @@ import '../../../core/constants.dart';
 import '../../../src/palette.dart';
 import '../../devices/models/device_info.dart';
 import '../../devices/widgets/device_picker.dart';
+import '../models/noise_filter.dart';
 
 /// Top horizontal bar providing device, process, search, and severity filters.
 class TopFilterBar extends StatelessWidget {
@@ -21,6 +22,8 @@ class TopFilterBar extends StatelessWidget {
     required this.onPackage,
     required this.onRegex,
     required this.onDevice,
+    this.noiseMode = NoiseFilterMode.reduce,
+    this.onNoiseMode,
   });
 
   final TextEditingController searchCtrl;
@@ -35,6 +38,8 @@ class TopFilterBar extends StatelessWidget {
   final VoidCallback onPackage;
   final VoidCallback onRegex;
   final ValueChanged<String?> onDevice;
+  final NoiseFilterMode noiseMode;
+  final ValueChanged<NoiseFilterMode>? onNoiseMode;
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +65,10 @@ class TopFilterBar extends StatelessWidget {
           _processField(palette),
           const SizedBox(width: 8),
 
+          // Noise reduction mode selector
+          _noiseField(palette),
+          const SizedBox(width: 8),
+
           // Unified search input with regex and clear
           _searchField(palette),
           const SizedBox(width: 8),
@@ -67,6 +76,178 @@ class TopFilterBar extends StatelessWidget {
           // Level dropdown (Verbose, Debug, Info, Warn, Error, Assert)
           _levelDropdown(palette),
         ],
+      ),
+    );
+  }
+
+  Widget _noiseField(AppPalette palette) {
+    final isReduced = noiseMode == NoiseFilterMode.reduce;
+    final isOnlyNoise = noiseMode == NoiseFilterMode.onlyNoise;
+
+    final Color activeColor = isReduced
+        ? palette.accent
+        : (isOnlyNoise
+            ? (palette.levelColor['W'] ?? Colors.orange)
+            : palette.dim);
+    final Color activeBg = isReduced
+        ? palette.accentBg
+        : (isOnlyNoise
+            ? (palette.levelColor['W'] ?? Colors.orange).withValues(alpha: 0.15)
+            : palette.bg);
+
+    return PopupMenuButton<NoiseFilterMode>(
+      tooltip: 'Filter out repetitive Android system & daemon noise',
+      initialValue: noiseMode,
+      onSelected: onNoiseMode,
+      color: palette.panel,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(color: palette.border),
+      ),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: NoiseFilterMode.reduce,
+          child: Row(
+            children: [
+              Icon(Icons.cleaning_services, size: 14, color: palette.accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Reduce Noise (Default)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: palette.text,
+                        fontWeight:
+                            isReduced ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      'Hides low-level OS, Wi-Fi, BT & compositor spam',
+                      style: TextStyle(fontSize: 10, color: palette.dim),
+                    ),
+                  ],
+                ),
+              ),
+              if (isReduced)
+                Icon(Icons.check, size: 14, color: palette.accent),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: NoiseFilterMode.showAll,
+          child: Row(
+            children: [
+              Icon(Icons.format_list_bulleted, size: 14, color: palette.dim),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Show All (Include Noise)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: palette.text,
+                        fontWeight: noiseMode == NoiseFilterMode.showAll
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      'Shows raw unfiltered logcat stream',
+                      style: TextStyle(fontSize: 10, color: palette.dim),
+                    ),
+                  ],
+                ),
+              ),
+              if (noiseMode == NoiseFilterMode.showAll)
+                Icon(Icons.check, size: 14, color: palette.accent),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: NoiseFilterMode.onlyNoise,
+          child: Row(
+            children: [
+              Icon(
+                Icons.filter_alt,
+                size: 14,
+                color: palette.levelColor['W'] ?? Colors.orange,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Only Noise',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: palette.text,
+                        fontWeight:
+                            isOnlyNoise ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      'Inspect filtered system chatter and daemons',
+                      style: TextStyle(fontSize: 10, color: palette.dim),
+                    ),
+                  ],
+                ),
+              ),
+              if (isOnlyNoise)
+                Icon(
+                  Icons.check,
+                  size: 14,
+                  color: palette.levelColor['W'] ?? Colors.orange,
+                ),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        height: 32,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: activeBg,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: (isReduced || isOnlyNoise) ? activeColor : palette.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isReduced
+                  ? Icons.cleaning_services
+                  : (isOnlyNoise ? Icons.filter_alt : Icons.format_list_bulleted),
+              size: 13,
+              color: activeColor,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isReduced
+                  ? 'Noise: Reduced'
+                  : (isOnlyNoise ? 'Noise: Only' : 'Noise: All'),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: (isReduced || isOnlyNoise)
+                    ? FontWeight.w600
+                    : FontWeight.w400,
+                color: (isReduced || isOnlyNoise) ? activeColor : palette.text,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(Icons.arrow_drop_down, size: 14, color: palette.dim),
+          ],
+        ),
       ),
     );
   }

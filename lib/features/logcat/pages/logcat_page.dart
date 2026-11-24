@@ -205,11 +205,13 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                     appPid: _controller.appPid,
                     devices: _controller.devices,
                     pickedDevice: _controller.pickedDevice,
+                    noiseMode: _controller.noiseMode,
                     onSearch: (v) => _controller.setSearch(v, immediate: false),
                     onLevel: _controller.setMinLevel,
                     onPackage: _controller.applyPackage,
                     onRegex: _controller.toggleRegex,
                     onDevice: _controller.applyDevice,
+                    onNoiseMode: _controller.setNoiseMode,
                   );
                 },
               ),
@@ -362,6 +364,8 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                     autoScroll: _controller.autoScroll,
                     visibleCount: _controller.visible.length,
                     totalCount: _controller.lines.length,
+                    hiddenNoiseCount: _controller.hiddenNoiseCount,
+                    reduceNoise: _controller.reduceNoise,
                   );
                 },
               ),
