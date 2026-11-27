@@ -1,3 +1,6 @@
+/// Aggregate line counters published to UI status/empty-state listeners.
+typedef LogStats = ({int total, int visible, int hiddenNoise});
+
 /// String canonicalization pool to reduce garbage collection churn on repeating tags and packages.
 class StringPool {
   static final Map<String, String> _pool = {};

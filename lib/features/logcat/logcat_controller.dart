@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -52,6 +53,14 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   /// itself is rebuilt.
   final ValueNotifier<List<LogEntry>> visibleNotifier =
       ValueNotifier<List<LogEntry>>([]);
+
+  /// Publishes aggregate line counts independently of [ChangeNotifier] so
+  /// incoming log batches update the status bar without rebuilding toolbars.
+  final ValueNotifier<LogStats> statsNotifier = ValueNotifier<LogStats>((
+    total: 0,
+    visible: 0,
+    hiddenNoise: 0,
+  ));
 
   final ScrollController scrollController = ScrollController();
   final TextEditingController searchController = TextEditingController();
@@ -321,59 +330,46 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
           return;
         }
 
-        // Phase 2.2: Incremental filtering - test ONLY newly arrived lines
-        final passing = lines.where(_matchesFilter).toList(growable: false);
-        if (_noiseMode == NoiseFilterMode.reduce) {
-          final currentPkg = pkgController.text.trim();
-          for (final l in lines) {
-            if (!_matchesFilter(l) &&
-                NoiseFilter.isNoise(
-                  l,
-                  appPid: _appPid,
-                  packageFilter: currentPkg,
-                )) {
-              _hiddenNoiseCount++;
-            }
+        // Phase 2.2: Incremental filtering - evaluate each newly arrived line once
+        final currentPkg = pkgController.text.trim();
+        final isReduced = _noiseMode == NoiseFilterMode.reduce;
+        final needsNoiseCheck =
+            isReduced ||
+            _noiseMode == NoiseFilterMode.onlyNoise ||
+            _cachedQuery.hasNoiseTerm;
+        final passing = <LogEntry>[];
+
+        for (final l in lines) {
+          final isNoise =
+              needsNoiseCheck
+                  ? NoiseFilter.isNoise(
+                    l,
+                    appPid: _appPid,
+                    packageFilter: currentPkg,
+                  )
+                  : false;
+          if (_matchesEntry(l, currentPkg: currentPkg, isNoise: isNoise)) {
+            passing.add(l);
+          } else if (isReduced && isNoise) {
+            _hiddenNoiseCount++;
           }
-          if (excess > 0 && _hiddenNoiseCount > _lines.length) {
-            _hiddenNoiseCount = (_lines.length - _visible.length).clamp(
-              0,
-              _lines.length,
-            );
-          }
+        }
+        if (excess > 0 && _hiddenNoiseCount > _lines.length) {
+          _hiddenNoiseCount = (_lines.length - _visible.length).clamp(
+            0,
+            _lines.length,
+          );
+        }
+        if (excess > 0) {
+          _trimVisibleToBufferStart();
         }
         if (passing.isNotEmpty) {
-          if (excess > 0 && _visible.isNotEmpty) {
-            final minSeq = _lines.first.seq;
-            var trimCount = 0;
-            while (trimCount < _visible.length &&
-                _visible[trimCount].seq < minSeq) {
-              trimCount++;
-            }
-            if (trimCount > 0) {
-              _visible.removeRange(0, trimCount);
-            }
-            _visible.addAll(passing);
-          } else {
-            _visible.addAll(passing);
-          }
-        } else if (excess > 0 && _visible.isNotEmpty) {
-          final minSeq = _lines.first.seq;
-          var trimCount = 0;
-          while (trimCount < _visible.length &&
-              _visible[trimCount].seq < minSeq) {
-            trimCount++;
-          }
-          if (trimCount > 0) {
-            _visible.removeRange(0, trimCount);
-          }
+          _visible.addAll(passing);
         }
 
-        // Phase 2.1: Exactly one notifyListeners per incoming batch
-        // Also publish the updated visible list to visibleNotifier so the
-        // log table can rebuild independently of the full controller listeners.
-        visibleNotifier.value = List<LogEntry>.unmodifiable(_visible);
-        notifyListeners();
+        // Phase 2.1: Publish via targeted ValueNotifiers only so incoming log
+        // batches rebuild the list and status bar without rebuilding toolbars.
+        _publishVisibleAndStats();
         if (_autoScroll) {
           scrollToBottom();
         }
@@ -474,14 +470,34 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     _cachedQuery = LogQuery(_search, useRegex: _useRegex);
   }
 
-  bool _matchesFilter(LogEntry e) {
-    if (e.rank < _cachedMinRank) return false;
+  void _trimVisibleToBufferStart() {
+    if (_visible.isEmpty || _lines.isEmpty) return;
+    final minSeq = _lines.first.seq;
+    var trimCount = 0;
+    while (trimCount < _visible.length && _visible[trimCount].seq < minSeq) {
+      trimCount++;
+    }
+    if (trimCount > 0) {
+      _visible.removeRange(0, trimCount);
+    }
+  }
 
-    final isNoise = NoiseFilter.isNoise(
-      e,
-      appPid: _appPid,
-      packageFilter: pkgController.text.trim(),
+  void _publishVisibleAndStats() {
+    // UnmodifiableListView wraps _visible in O(1) without copying the list.
+    visibleNotifier.value = UnmodifiableListView<LogEntry>(_visible);
+    statsNotifier.value = (
+      total: _lines.length,
+      visible: _visible.length,
+      hiddenNoise: _hiddenNoiseCount,
     );
+  }
+
+  bool _matchesEntry(
+    LogEntry e, {
+    required String currentPkg,
+    required bool isNoise,
+  }) {
+    if (e.rank < _cachedMinRank) return false;
 
     if (!_cachedQuery.hasNoiseTerm) {
       if (_noiseMode == NoiseFilterMode.reduce && isNoise) {
@@ -497,10 +513,10 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
         'tag' => term.matches(e.tag),
         'message' => term.matches(e.msg),
         'package' => term.matches(
-          e.pkg ?? (_appPid == e.pid ? pkgController.text.trim() : ''),
+          e.pkg ?? (_appPid == e.pid ? currentPkg : ''),
         ),
         'process' => term.matches(
-          e.pkg ?? (_appPid == e.pid ? pkgController.text.trim() : '${e.pid}'),
+          e.pkg ?? (_appPid == e.pid ? currentPkg : '${e.pid}'),
         ),
         'level' => _matchesLevelTerm(e, term.value, term.negated),
         'is' => term.matches(isNoise ? 'noise' : 'clean'),
@@ -530,19 +546,29 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     _visible.clear();
     int hidden = 0;
     final isReduced = _noiseMode == NoiseFilterMode.reduce;
+    final needsNoiseCheck =
+        isReduced ||
+        _noiseMode == NoiseFilterMode.onlyNoise ||
+        _cachedQuery.hasNoiseTerm;
     final currentPkg = pkgController.text.trim();
 
     for (final e in _lines) {
-      if (_matchesFilter(e)) {
+      final isNoise =
+          needsNoiseCheck
+              ? NoiseFilter.isNoise(
+                e,
+                appPid: _appPid,
+                packageFilter: currentPkg,
+              )
+              : false;
+      if (_matchesEntry(e, currentPkg: currentPkg, isNoise: isNoise)) {
         _visible.add(e);
-      } else if (isReduced &&
-          NoiseFilter.isNoise(e, appPid: _appPid, packageFilter: currentPkg)) {
+      } else if (isReduced && isNoise) {
         hidden++;
       }
     }
     _hiddenNoiseCount = hidden;
-    // Publish a new list reference so visibleNotifier listeners rebuild.
-    visibleNotifier.value = List<LogEntry>.unmodifiable(_visible);
+    _publishVisibleAndStats();
     notifyListeners();
   }
 
@@ -658,28 +684,30 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     applyPackage();
   }
 
+  String _formatEntry(LogEntry e, String currentPkg) {
+    final parts = <String>[];
+    if (_columns.showTime) parts.add(e.time);
+    if (_columns.showPidTid) parts.add('${e.pid}-${e.tid}');
+    if (_columns.showPackage) {
+      final pkg =
+          e.pkg ?? (_appPid != null && e.pid == _appPid ? currentPkg : null);
+      if (pkg != null && pkg.isNotEmpty) parts.add(pkg);
+    }
+    if (_columns.showLevel && _columns.showTag) {
+      parts.add('${e.level}/${e.tag}:');
+    } else {
+      if (_columns.showLevel) parts.add('[${e.level}]');
+      if (_columns.showTag) parts.add('${e.tag}:');
+    }
+    parts.add(e.msg);
+    return parts.join(' ');
+  }
+
   Future<String> exportLogs() async {
     final buf = StringBuffer();
+    final currentPkg = pkgController.text.trim();
     for (final e in _visible) {
-      final parts = <String>[];
-      if (_columns.showTime) parts.add(e.time);
-      if (_columns.showPidTid) parts.add('${e.pid}-${e.tid}');
-      if (_columns.showPackage) {
-        final pkg =
-            e.pkg ??
-            (_appPid != null && e.pid == _appPid
-                ? pkgController.text.trim()
-                : null);
-        if (pkg != null && pkg.isNotEmpty) parts.add(pkg);
-      }
-      if (_columns.showLevel && _columns.showTag) {
-        parts.add('${e.level}/${e.tag}:');
-      } else {
-        if (_columns.showLevel) parts.add('[${e.level}]');
-        if (_columns.showTag) parts.add('${e.tag}:');
-      }
-      parts.add(e.msg);
-      buf.writeln(parts.join(' '));
+      buf.writeln(_formatEntry(e, currentPkg));
     }
     final stamp = DateTime.now().toIso8601String().replaceAll(
       RegExp(r'[:.]'),
@@ -691,26 +719,9 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void copyLogEntry(LogEntry e) {
-    final parts = <String>[];
-    if (_columns.showTime) parts.add(e.time);
-    if (_columns.showPidTid) parts.add('${e.pid}-${e.tid}');
-    if (_columns.showPackage) {
-      final pkg =
-          e.pkg ??
-          (_appPid != null && e.pid == _appPid
-              ? pkgController.text.trim()
-              : null);
-      if (pkg != null && pkg.isNotEmpty) parts.add(pkg);
-    }
-    if (_columns.showLevel && _columns.showTag) {
-      parts.add('${e.level}/${e.tag}:');
-    } else {
-      if (_columns.showLevel) parts.add('[${e.level}]');
-      if (_columns.showTag) parts.add('${e.tag}:');
-    }
-    parts.add(e.msg);
-
-    Clipboard.setData(ClipboardData(text: parts.join(' ')));
+    Clipboard.setData(
+      ClipboardData(text: _formatEntry(e, pkgController.text.trim())),
+    );
   }
 
   @override
@@ -728,6 +739,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     searchController.dispose();
     pkgController.dispose();
     visibleNotifier.dispose();
+    statsNotifier.dispose();
     stopBridge();
     super.dispose();
   }

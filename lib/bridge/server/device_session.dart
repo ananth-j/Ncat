@@ -24,6 +24,7 @@ class DeviceSession {
   }
 
   static final RegExp serialRegex = RegExp(r'^[a-zA-Z0-9._:-]{1,64}$');
+  static final RegExp _wsRe = RegExp(r'\s+');
 
   /// Validates that a device serial matches safe alphanumeric / identifier patterns
   /// and does not start with flags like '-'.
@@ -169,7 +170,7 @@ class DeviceSession {
           '-A',
         ]);
         for (final l in (r.stdout as String).split('\n')) {
-          final cols = l.trim().split(RegExp(r'\s+'));
+          final cols = l.trim().split(_wsRe);
           if (cols.length >= 9) {
             final p = int.tryParse(cols[1]);
             final name = cols.last;
@@ -206,7 +207,7 @@ class DeviceSession {
           pkg,
         ]);
         pid = int.tryParse(
-          (r.stdout as String).trim().split(RegExp(r'\s+')).first,
+          (r.stdout as String).trim().split(_wsRe).first,
         );
       } catch (_) {}
     }

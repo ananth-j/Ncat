@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../src/column_config.dart';
@@ -38,6 +39,7 @@ class LogTableView extends StatefulWidget {
     required this.onScrollToEnd,
     required this.onUpdateColumns,
     this.entriesNotifier,
+    this.statsNotifier,
   });
 
   final List<LogEntry> entries;
@@ -46,6 +48,10 @@ class LogTableView extends StatefulWidget {
   /// of the parent widget — entries arriving via the notifier do not cause the
   /// header, toolbar, or status bar to rebuild.
   final ValueNotifier<List<LogEntry>>? entriesNotifier;
+
+  /// Optional line-count notifier used for the empty-state label so that
+  /// transitioning from 0 to >0 total lines updates without rebuilding the page.
+  final ValueListenable<LogStats>? statsNotifier;
 
   final int totalLinesCount;
   final LogColumnConfig columns;
@@ -264,12 +270,24 @@ class _LogTableViewState extends State<LogTableView> {
               color: palette.dim.withValues(alpha: 0.4),
             ),
             const SizedBox(height: 10),
-            Text(
-              widget.totalLinesCount == 0
-                  ? 'Waiting for log output...'
-                  : 'Nothing matches the current filter.',
-              style: TextStyle(color: palette.dim, fontSize: 13),
-            ),
+            if (widget.statsNotifier != null)
+              ValueListenableBuilder<LogStats>(
+                valueListenable: widget.statsNotifier!,
+                builder:
+                    (context, stats, _) => Text(
+                      stats.total == 0
+                          ? 'Waiting for log output...'
+                          : 'Nothing matches the current filter.',
+                      style: TextStyle(color: palette.dim, fontSize: 13),
+                    ),
+              )
+            else
+              Text(
+                widget.totalLinesCount == 0
+                    ? 'Waiting for log output...'
+                    : 'Nothing matches the current filter.',
+                style: TextStyle(color: palette.dim, fontSize: 13),
+              ),
           ],
         ),
       );

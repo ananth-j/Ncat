@@ -307,11 +307,13 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                           },
                         ),
 
-                        // Log entries table view - rebuilds only on controller state changes
+                        // Log entries table view - rebuilds only on controller config changes;
+                        // incoming log batches update via visibleNotifier & statsNotifier.
                         Expanded(
                           child: LogTableView(
                             entries: _controller.visible,
                             entriesNotifier: _controller.visibleNotifier,
+                            statsNotifier: _controller.statsNotifier,
                             totalLinesCount: _controller.lines.length,
                             columns: _controller.columns,
                             wrap: _controller.wrap,
@@ -352,8 +354,12 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
 
               // Bottom status bar - rebuilds on log/connection counts
               ListenableBuilder(
-                listenable: _controller,
+                listenable: Listenable.merge([
+                  _controller,
+                  _controller.statsNotifier,
+                ]),
                 builder: (context, _) {
+                  final stats = _controller.statsNotifier.value;
                   return LogcatStatusBar(
                     connection: _controller.connection,
                     serverStatus: _controller.serverStatus,
@@ -362,9 +368,9 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                     appPid: _controller.appPid,
                     paused: _controller.paused,
                     autoScroll: _controller.autoScroll,
-                    visibleCount: _controller.visible.length,
-                    totalCount: _controller.lines.length,
-                    hiddenNoiseCount: _controller.hiddenNoiseCount,
+                    visibleCount: stats.visible,
+                    totalCount: stats.total,
+                    hiddenNoiseCount: stats.hiddenNoise,
                     reduceNoise: _controller.reduceNoise,
                   );
                 },

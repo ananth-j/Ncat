@@ -5,16 +5,19 @@
 /// regular expression. Unqualified terms search the tag and message.
 class LogQuery {
   LogQuery(String source, {this.useRegex = false})
-    : terms = _parseTerms(source, useRegex);
+    : terms = _parseTerms(source, useRegex) {
+    hasNoiseTerm = terms.any(
+      (t) => t.field == 'is' && t.value.toLowerCase() == 'noise',
+    );
+  }
 
   final bool useRegex;
   final List<LogQueryTerm> terms;
 
-  bool get isEmpty => terms.isEmpty;
-
   /// Whether the query explicitly checks for noise status (e.g. `is:noise` or `-is:noise`).
-  bool get hasNoiseTerm =>
-      terms.any((t) => t.field == 'is' && t.value.toLowerCase() == 'noise');
+  late final bool hasNoiseTerm;
+
+  bool get isEmpty => terms.isEmpty;
 }
 
 class LogQueryTerm {
@@ -41,8 +44,10 @@ class LogQueryTerm {
   }
 }
 
+final RegExp _tokenRegex = RegExp(r'''(?:[^\s"']+|"[^"]*"|'[^']*')+''');
+
 List<LogQueryTerm> _parseTerms(String source, bool useRegex) {
-  final tokens = RegExp(r'''(?:[^\s"']+|"[^"]*"|'[^']*')+''')
+  final tokens = _tokenRegex
       .allMatches(source)
       .map((m) => m.group(0)!)
       .toList(growable: false);

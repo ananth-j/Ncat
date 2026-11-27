@@ -374,5 +374,35 @@ void main() {
       expect(controller.visible.length, 1);
       expect(controller.visible.first.tag, 'AppController');
     });
+
+    test(
+      'LogBatchMessage isolates rebuilds to visibleNotifier and statsNotifier',
+      () {
+        var controllerNotifications = 0;
+        var visibleNotifications = 0;
+        var statsNotifications = 0;
+
+        controller.addListener(() => controllerNotifications++);
+        controller.visibleNotifier.addListener(() => visibleNotifications++);
+        controller.statsNotifier.addListener(() => statsNotifications++);
+
+        controller.handleMessage(
+          LogBatchMessage([
+            createEntry(1, 'I', 'AppTag', 'Visible entry'),
+            createEntry(2, 'D', 'SurfaceFlinger', 'Noise entry'),
+          ]),
+        );
+
+        expect(controllerNotifications, 0);
+        expect(visibleNotifications, 1);
+        expect(statsNotifications, 1);
+        expect(controller.visibleNotifier.value.length, 1);
+        expect(controller.statsNotifier.value, (
+          total: 2,
+          visible: 1,
+          hiddenNoise: 1,
+        ));
+      },
+    );
   });
 }
