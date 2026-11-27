@@ -26,7 +26,34 @@ export '../devices/device_controller.dart'
 export 'models/log_tab_state.dart' show LogTabState;
 export 'models/noise_filter.dart' show NoiseFilterMode, NoiseFilter;
 
-/// Central state controller for logcat streaming, multi-tab filtering, presets, and export.
+/// Split-pane layout orientation for viewing two log tabs simultaneously.
+enum LogSplitAxis { none, horizontal, vertical }
+
+/// Isolated per-pane buffer, filtered list, notifiers, and scroll controller.
+class _LogPaneSlot {
+  final List<LogEntry> lines = [];
+  final List<LogEntry> visible = [];
+  final ValueNotifier<List<LogEntry>> visibleNotifier =
+      ValueNotifier<List<LogEntry>>([]);
+  final ValueNotifier<LogStats> statsNotifier = ValueNotifier<LogStats>((
+    total: 0,
+    visible: 0,
+    hiddenNoise: 0,
+  ));
+  final ScrollController scrollController = ScrollController();
+
+  int hiddenNoiseCount = 0;
+  int cachedMinRank = 0;
+  LogQuery cachedQuery = LogQuery('');
+
+  void dispose() {
+    scrollController.dispose();
+    visibleNotifier.dispose();
+    statsNotifier.dispose();
+  }
+}
+
+/// Central state controller for logcat streaming, multi-tab filtering, split panes, presets, and export.
 class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   LogcatController({
     int maxLines = kMaxLines,
@@ -43,28 +70,39 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  final List<LogEntry> _lines = [];
-  final List<LogEntry> _visible = [];
+  final _LogPaneSlot _pane0 = _LogPaneSlot();
+  final _LogPaneSlot _pane1 = _LogPaneSlot();
+  int _focusedPane = 0;
+  LogSplitAxis _splitAxis = LogSplitAxis.none;
+  double _splitRatio = 0.5;
+  String _pane0TabId = 'tab_1';
+  String? _pane1TabId;
 
-  /// A dedicated [ValueNotifier] for the visible list.
-  ///
-  /// UI components that only need to react to new log rows (e.g. the log
-  /// table) should subscribe to this notifier rather than the full
-  /// [ChangeNotifier]. That way incoming log batches do not force a rebuild
-  /// of every widget that listens to the controller — only the list view
-  /// itself is rebuilt.
-  final ValueNotifier<List<LogEntry>> visibleNotifier =
-      ValueNotifier<List<LogEntry>>([]);
+  _LogPaneSlot get _focusedSlot => _focusedPane == 1 && isSplit ? _pane1 : _pane0;
 
-  /// Publishes aggregate line counts independently of [ChangeNotifier] so
-  /// incoming log batches update the status bar without rebuilding toolbars.
-  final ValueNotifier<LogStats> statsNotifier = ValueNotifier<LogStats>((
-    total: 0,
-    visible: 0,
-    hiddenNoise: 0,
-  ));
+  /// Dedicated [ValueNotifier] for the primary pane's visible list.
+  ValueNotifier<List<LogEntry>> get visibleNotifier => _pane0.visibleNotifier;
 
-  final ScrollController scrollController = ScrollController();
+  /// Publishes aggregate line counts for the primary pane.
+  ValueNotifier<LogStats> get statsNotifier => _pane0.statsNotifier;
+
+  ScrollController get scrollController => _pane0.scrollController;
+
+  // Explicit primary & secondary pane accessors for split view rendering
+  ValueNotifier<List<LogEntry>> get primaryVisibleNotifier =>
+      _pane0.visibleNotifier;
+  ValueNotifier<LogStats> get primaryStatsNotifier => _pane0.statsNotifier;
+  ScrollController get primaryScrollController => _pane0.scrollController;
+  List<LogEntry> get primaryLines => _pane0.lines;
+  List<LogEntry> get primaryVisible => _pane0.visible;
+
+  ValueNotifier<List<LogEntry>> get secondaryVisibleNotifier =>
+      _pane1.visibleNotifier;
+  ValueNotifier<LogStats> get secondaryStatsNotifier => _pane1.statsNotifier;
+  ScrollController get secondaryScrollController => _pane1.scrollController;
+  List<LogEntry> get secondaryLines => _pane1.lines;
+  List<LogEntry> get secondaryVisible => _pane1.visible;
+
   final TextEditingController searchController = TextEditingController();
   final TextEditingController pkgController = TextEditingController();
 
@@ -98,29 +136,26 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   bool _autoScroll = true;
   bool _useRegex = false;
   NoiseFilterMode _noiseMode = NoiseFilterMode.reduce;
-  int _hiddenNoiseCount = 0;
 
   // Background mode tracking (Phase 2.4)
   bool _isAppActive = true;
   bool _needsUiSync = false;
 
-  // Filter cache (Phase 2.2)
-  int _cachedMinRank = 0;
-  LogQuery _cachedQuery = LogQuery('');
-
   LogColumnConfig _columns = const LogColumnConfig();
 
   // Getters
   int get maxLines => _maxLines;
-  List<LogEntry> get lines => _lines;
-  List<LogEntry> get visible => _visible;
+  List<LogEntry> get lines => _focusedSlot.lines;
+  List<LogEntry> get visible => _focusedSlot.visible;
   String get connection => _connection;
   String get serverStatus => _serverStatus;
 
   /// Effective PID for the active tab's package filter on its target device.
-  int? get appPid {
-    final pkg = pkgController.text.trim();
-    final serial = activeTabSerial;
+  int? get appPid => appPidForTab(activeTab);
+
+  int? appPidForTab(LogTabState tab) {
+    final pkg = tab.packageFilter.trim();
+    final serial = _effectiveSerialFor(tab);
     if (pkg.isNotEmpty) {
       if (serial != null) {
         final cached = _deviceController.tabStates[serial]?.packagePids[pkg];
@@ -147,28 +182,43 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   bool get useRegex => _useRegex;
   NoiseFilterMode get noiseMode => _noiseMode;
   bool get reduceNoise => _noiseMode == NoiseFilterMode.reduce;
-  int get hiddenNoiseCount => _hiddenNoiseCount;
+  int get hiddenNoiseCount => _focusedSlot.hiddenNoiseCount;
   LogColumnConfig get columns => _columns;
 
-  // Multi-tab getters
+  // Multi-tab & split getters
   List<LogTabState> get logTabs => List.unmodifiable(_tabs);
   String get activeTabId => _activeTabId;
-  LogTabState get activeTab => _tabs.firstWhere(
-    (t) => t.id == _activeTabId,
-    orElse: () => _tabs.first,
-  );
+  LogTabState get activeTab => _tabById(_activeTabId);
   int get activeTabIndex =>
       _tabs.indexWhere((t) => t.id == activeTab.id).clamp(0, _tabs.length - 1);
-  String? get activeTabSerial =>
-      activeTab.deviceSerial ?? _deviceController.activeDevice;
+  String? get activeTabSerial => _effectiveSerialFor(activeTab);
+
+  LogSplitAxis get splitAxis => _splitAxis;
+  double get splitRatio => _splitRatio;
+  int get focusedPane => _focusedPane;
+  bool get isSplit => _splitAxis != LogSplitAxis.none && secondaryTab != null;
+  LogTabState get primaryTab => _tabById(_pane0TabId);
+  LogTabState? get secondaryTab =>
+      _pane1TabId == null ? null : _tabByIdOrNull(_pane1TabId!);
+
+  LogTabState _tabById(String id) =>
+      _tabs.firstWhere((t) => t.id == id, orElse: () => _tabs.first);
+
+  LogTabState? _tabByIdOrNull(String id) {
+    for (final t in _tabs) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
 
   String? _effectiveSerialFor(LogTabState tab) =>
       tab.deviceSerial ?? _deviceController.activeDevice;
 
   void init() {
     WidgetsBinding.instance.addObserver(this);
-    scrollController.addListener(_onScroll);
-    _updateFilterCache();
+    _pane0.scrollController.addListener(() => _onPaneScroll(0));
+    _pane1.scrollController.addListener(() => _onPaneScroll(1));
+    _updateFilterCache(_pane0, primaryTab);
 
     loadColumnConfig().then((c) {
       _columns = c;
@@ -188,11 +238,13 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
                     _tabs.any((t) => t.id == saved.activeTabId)
                 ? saved.activeTabId!
                 : _tabs.first.id;
+        _pane0TabId = targetId;
         _activeTabId = targetId;
+        _focusedPane = 0;
         _nextTabCounter = _computeNextTabCounter(_tabs);
         _loadTabFields(activeTab);
-        _syncLinesFromActiveBuffer();
-        _recompute();
+        _syncPaneLinesFromBuffer(0);
+        _recomputePane(0);
       }
     });
     _initBridgeAndConnect();
@@ -213,75 +265,89 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Phase 2.4: When window is hidden/minimized/unfocused, buffer without rebuilding UI
     final active = state == AppLifecycleState.resumed;
     if (_isAppActive != active) {
       _isAppActive = active;
       if (_isAppActive && _needsUiSync) {
         _needsUiSync = false;
-        _recompute();
+        _recomputeAllPanes();
       }
     }
   }
 
-  void _onScroll() {
-    if (!scrollController.hasClients) return;
-    final max = scrollController.position.maxScrollExtent;
-    final current = scrollController.offset;
+  void _onPaneScroll(int paneIndex) {
+    final slot = paneIndex == 1 ? _pane1 : _pane0;
+    final tab = paneIndex == 1 ? secondaryTab : primaryTab;
+    if (tab == null || !slot.scrollController.hasClients) return;
+
+    final max = slot.scrollController.position.maxScrollExtent;
+    final current = slot.scrollController.offset;
     final atBottom = max <= 0 || current >= (max - 50);
-    if (atBottom && !_autoScroll) {
-      _autoScroll = true;
-      activeTab.autoScroll = true;
+
+    if (atBottom && !tab.autoScroll) {
+      tab.autoScroll = true;
+      if (paneIndex == _focusedPane) _autoScroll = true;
       notifyListeners();
-    } else if (!atBottom && _autoScroll) {
-      _autoScroll = false;
-      activeTab.autoScroll = false;
-      activeTab.scrollOffset = current;
+    } else if (!atBottom && tab.autoScroll) {
+      tab.autoScroll = false;
+      tab.scrollOffset = current;
+      if (paneIndex == _focusedPane) _autoScroll = false;
       notifyListeners();
-    } else if (!_autoScroll) {
-      activeTab.scrollOffset = current;
+    } else if (!tab.autoScroll) {
+      tab.scrollOffset = current;
     }
   }
 
-  /// Fixed row height used by [ListView.builder] when wrap is off.
-  /// Must stay in sync with the [itemExtent] value in [LogTableView._logList].
   static const double _rowExtent = 23.0;
 
-  /// Jumps the scroll position to the bottom of the list.
-  void scrollToBottom() {
-    if (!_isAppActive || !scrollController.hasClients) return;
+  void scrollToBottom([int? paneIndex]) {
+    final idx = paneIndex ?? _focusedPane;
+    final slot = idx == 1 && isSplit ? _pane1 : _pane0;
+    final tab = idx == 1 && isSplit ? secondaryTab! : primaryTab;
+    if (!_isAppActive || !slot.scrollController.hasClients) return;
 
-    if (!_wrap && _visible.isNotEmpty) {
-      final viewportHeight = scrollController.position.viewportDimension;
-      final totalHeight = _visible.length * _rowExtent;
+    if (!tab.wrap && slot.visible.isNotEmpty) {
+      final viewportHeight = slot.scrollController.position.viewportDimension;
+      final totalHeight = slot.visible.length * _rowExtent;
       final target = (totalHeight - viewportHeight).clamp(
         0.0,
         double.infinity,
       );
-      scrollController.jumpTo(target);
+      slot.scrollController.jumpTo(target);
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_autoScroll && scrollController.hasClients) {
-          scrollController.jumpTo(scrollController.position.maxScrollExtent);
+        if (tab.autoScroll && slot.scrollController.hasClients) {
+          slot.scrollController.jumpTo(
+            slot.scrollController.position.maxScrollExtent,
+          );
         }
       });
     }
   }
 
-  void scrollToEnd() {
-    scrollToBottom();
-    _autoScroll = true;
-    activeTab.autoScroll = true;
+  void scrollToEnd([int? paneIndex]) {
+    final idx = paneIndex ?? _focusedPane;
+    final tab = idx == 1 && isSplit ? secondaryTab! : primaryTab;
+    scrollToBottom(idx);
+    tab.autoScroll = true;
+    if (idx == _focusedPane) {
+      _autoScroll = true;
+    }
     notifyListeners();
   }
 
-  void scrollToTop() {
-    _autoScroll = false;
-    activeTab.autoScroll = false;
-    activeTab.scrollOffset = 0.0;
+  void scrollToTop([int? paneIndex]) {
+    final idx = paneIndex ?? _focusedPane;
+    final slot = idx == 1 && isSplit ? _pane1 : _pane0;
+    final tab = idx == 1 && isSplit ? secondaryTab! : primaryTab;
+    tab.autoScroll = false;
+    tab.scrollOffset = 0.0;
+    if (idx == _focusedPane) {
+      _autoScroll = false;
+    }
     notifyListeners();
-    if (scrollController.hasClients) {
-      scrollController.jumpTo(0);
+    if (slot.scrollController.hasClients) {
+      slot.scrollController.jumpTo(0);
     }
   }
 
@@ -352,28 +418,17 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
             ..clear()
             ..addAll(lines);
         }
-        final currentSerial = activeTabSerial;
-        if (targetSerial == null ||
-            currentSerial == null ||
-            targetSerial == currentSerial) {
-          if (!activeTab.paused) {
-            _lines
-              ..clear()
-              ..addAll(lines);
-            _recompute();
-            if (_autoScroll) {
-              scrollToBottom();
-            }
-          }
+        _applyHistoryToPane(0, primaryTab, lines, targetSerial);
+        if (isSplit) {
+          _applyHistoryToPane(1, secondaryTab!, lines, targetSerial);
         }
         break;
 
       case LogBatchMessage(:final lines, :final serial):
         final targetSerial = serial ?? _deviceController.activeDevice;
         if (targetSerial == null) {
-          if (_paused) return;
+          if (_paused && !isSplit) return;
         } else {
-          // Only drop incoming lines if ALL tabs targeting this device are paused.
           final matchingTabs =
               _tabs
                   .where((t) => _effectiveSerialFor(t) == targetSerial)
@@ -392,81 +447,9 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
           }
         }
 
-        // If batch belongs to a background device, keep it buffered without rebuilding UI.
-        final currentSerial = activeTabSerial;
-        if (targetSerial != null &&
-            currentSerial != null &&
-            targetSerial != currentSerial) {
-          return;
-        }
-
-        // If the active tab is paused while a sibling tab on the same device is live,
-        // leave the active tab's frozen snapshot untouched.
-        if (_paused) return;
-
-        _lines.addAll(lines);
-        final maxCapacity = _autoScroll ? _maxLines : _maxLines * 2;
-        final excess = _lines.length - maxCapacity;
-        if (excess > 0) {
-          _lines.removeRange(0, excess);
-        }
-
-        // Phase 2.4: If window is backgrounded/minimized, keep buffering but skip UI rebuilds
-        if (!_isAppActive) {
-          _needsUiSync = true;
-          return;
-        }
-
-        // Phase 2.2: Incremental filtering - evaluate each newly arrived line once
-        final currentPkg = pkgController.text.trim();
-        final currentAppPid = appPid;
-        final isReduced = _noiseMode == NoiseFilterMode.reduce;
-        final needsNoiseCheck =
-            isReduced ||
-            _noiseMode == NoiseFilterMode.onlyNoise ||
-            _cachedQuery.hasNoiseTerm;
-        final clearedAfter = activeTab.clearedAfterSeq;
-        final passing = <LogEntry>[];
-
-        for (final l in lines) {
-          if (clearedAfter != null && l.seq <= clearedAfter) continue;
-          final isNoise =
-              needsNoiseCheck
-                  ? NoiseFilter.isNoise(
-                    l,
-                    appPid: currentAppPid,
-                    packageFilter: currentPkg,
-                  )
-                  : false;
-          if (_matchesEntry(
-            l,
-            currentPkg: currentPkg,
-            tabAppPid: currentAppPid,
-            isNoise: isNoise,
-          )) {
-            passing.add(l);
-          } else if (isReduced && isNoise) {
-            _hiddenNoiseCount++;
-          }
-        }
-        if (excess > 0 && _hiddenNoiseCount > _lines.length) {
-          _hiddenNoiseCount = (_lines.length - _visible.length).clamp(
-            0,
-            _lines.length,
-          );
-        }
-        if (excess > 0) {
-          _trimVisibleToBufferStart();
-        }
-        if (passing.isNotEmpty) {
-          _visible.addAll(passing);
-        }
-
-        // Phase 2.1: Publish via targeted ValueNotifiers only so incoming log
-        // batches rebuild the list and status bar without rebuilding toolbars.
-        _publishVisibleAndStats();
-        if (_autoScroll) {
-          scrollToBottom();
+        _applyBatchToPane(0, primaryTab, lines, targetSerial);
+        if (isSplit) {
+          _applyBatchToPane(1, secondaryTab!, lines, targetSerial);
         }
         break;
 
@@ -484,13 +467,10 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
           activeTab.clearedAfterSeq = null;
           activeTab.pausedBufferSnapshot = null;
         }
-        final currentSerial = activeTabSerial;
-        if (targetSerial == null ||
-            currentSerial == null ||
-            targetSerial == currentSerial) {
-          _lines.clear();
-          _hiddenNoiseCount = 0;
-          _recompute();
+
+        _clearPaneIfMatches(0, primaryTab, targetSerial);
+        if (isSplit) {
+          _clearPaneIfMatches(1, secondaryTab!, targetSerial);
         }
         break;
 
@@ -524,8 +504,127 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  void _applyHistoryToPane(
+    int paneIndex,
+    LogTabState tab,
+    List<LogEntry> lines,
+    String? targetSerial,
+  ) {
+    final paneSerial = _effectiveSerialFor(tab);
+    if (targetSerial != null &&
+        paneSerial != null &&
+        targetSerial != paneSerial) {
+      return;
+    }
+    if (tab.paused) return;
+
+    final slot = paneIndex == 1 ? _pane1 : _pane0;
+    slot.lines
+      ..clear()
+      ..addAll(lines);
+    _recomputePane(paneIndex, notifyController: paneIndex == _focusedPane);
+    if (tab.autoScroll) {
+      scrollToBottom(paneIndex);
+    }
+  }
+
+  void _applyBatchToPane(
+    int paneIndex,
+    LogTabState tab,
+    List<LogEntry> lines,
+    String? targetSerial,
+  ) {
+    final paneSerial = _effectiveSerialFor(tab);
+    if (targetSerial != null &&
+        paneSerial != null &&
+        targetSerial != paneSerial) {
+      return;
+    }
+    if (tab.paused) return;
+
+    final slot = paneIndex == 1 ? _pane1 : _pane0;
+    slot.lines.addAll(lines);
+    final maxCapacity = tab.autoScroll ? _maxLines : _maxLines * 2;
+    final excess = slot.lines.length - maxCapacity;
+    if (excess > 0) {
+      slot.lines.removeRange(0, excess);
+    }
+
+    if (!_isAppActive) {
+      _needsUiSync = true;
+      return;
+    }
+
+    final currentPkg = tab.packageFilter.trim();
+    final currentAppPid = appPidForTab(tab);
+    final isReduced = tab.noiseMode == NoiseFilterMode.reduce;
+    final needsNoiseCheck =
+        isReduced ||
+        tab.noiseMode == NoiseFilterMode.onlyNoise ||
+        slot.cachedQuery.hasNoiseTerm;
+    final clearedAfter = tab.clearedAfterSeq;
+    final passing = <LogEntry>[];
+
+    for (final l in lines) {
+      if (clearedAfter != null && l.seq <= clearedAfter) continue;
+      final isNoise =
+          needsNoiseCheck
+              ? NoiseFilter.isNoise(
+                l,
+                appPid: currentAppPid,
+                packageFilter: currentPkg,
+              )
+              : false;
+      if (_matchesEntry(
+        l,
+        tab: tab,
+        slot: slot,
+        currentPkg: currentPkg,
+        tabAppPid: currentAppPid,
+        isNoise: isNoise,
+      )) {
+        passing.add(l);
+      } else if (isReduced && isNoise) {
+        slot.hiddenNoiseCount++;
+      }
+    }
+    if (excess > 0 && slot.hiddenNoiseCount > slot.lines.length) {
+      slot.hiddenNoiseCount = (slot.lines.length - slot.visible.length).clamp(
+        0,
+        slot.lines.length,
+      );
+    }
+    if (excess > 0) {
+      _trimVisibleToBufferStart(slot);
+    }
+    if (passing.isNotEmpty) {
+      slot.visible.addAll(passing);
+    }
+
+    _publishPaneVisibleAndStats(slot);
+    if (tab.autoScroll) {
+      scrollToBottom(paneIndex);
+    }
+  }
+
+  void _clearPaneIfMatches(
+    int paneIndex,
+    LogTabState tab,
+    String? targetSerial,
+  ) {
+    final paneSerial = _effectiveSerialFor(tab);
+    if (targetSerial == null ||
+        paneSerial == null ||
+        targetSerial == paneSerial) {
+      final slot = paneIndex == 1 ? _pane1 : _pane0;
+      slot.lines.clear();
+      slot.hiddenNoiseCount = 0;
+      _recomputePane(paneIndex, notifyController: paneIndex == _focusedPane);
+    }
+  }
+
   // ---------------------------------------------------------------------------
-  // Multi-tab management (single or multiple devices)
+  // Multi-tab & split-pane management
   // ---------------------------------------------------------------------------
 
   void _saveActiveTabFields() {
@@ -538,8 +637,9 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     tab.paused = _paused;
     tab.wrap = _wrap;
     tab.noiseMode = _noiseMode;
-    if (scrollController.hasClients) {
-      tab.scrollOffset = scrollController.offset;
+    final slot = _focusedSlot;
+    if (slot.scrollController.hasClients) {
+      tab.scrollOffset = slot.scrollController.offset;
     }
   }
 
@@ -553,21 +653,23 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     _paused = tab.paused;
     _wrap = tab.wrap;
     _noiseMode = tab.noiseMode;
-    _updateFilterCache();
   }
 
-  void _syncLinesFromActiveBuffer() {
-    final tab = activeTab;
+  void _syncPaneLinesFromBuffer(int paneIndex) {
+    final tab = paneIndex == 1 ? secondaryTab : primaryTab;
+    if (tab == null) return;
+    final slot = paneIndex == 1 ? _pane1 : _pane0;
+
     if (tab.paused && tab.pausedBufferSnapshot != null) {
-      _lines
+      slot.lines
         ..clear()
         ..addAll(tab.pausedBufferSnapshot!);
       return;
     }
-    final serial = activeTabSerial;
+    final serial = _effectiveSerialFor(tab);
     if (serial != null) {
       final devBuf = _getOrCreateDeviceBuffer(serial);
-      _lines
+      slot.lines
         ..clear()
         ..addAll(devBuf.lines);
     }
@@ -578,7 +680,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Adds a new log tab (optionally targeting [deviceSerial], applying a
-  /// [preset], or duplicating the active tab) and switches to it.
+  /// [preset], or duplicating the active tab) and opens it in the focused pane.
   String addTab({
     String? deviceSerial,
     FilterPreset? preset,
@@ -625,7 +727,6 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     return newTab.id;
   }
 
-  /// Duplicates an existing tab and activates the copy.
   String duplicateTab(String tabId) {
     final idx = _tabs.indexWhere((t) => t.id == tabId);
     if (idx < 0) return addTab(duplicateCurrent: true);
@@ -635,11 +736,158 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     return addTab(duplicateCurrent: true);
   }
 
-  /// Switches the active viewport to [tabId], saving the previous tab's filters
-  /// and scroll state and recomputing against the target tab's device buffer.
+  /// Reorders a tab in the tab strip from its current index to [newIndex].
+  void reorderTab(String draggedTabId, int newIndex) {
+    final oldIndex = _tabs.indexWhere((t) => t.id == draggedTabId);
+    if (oldIndex < 0) return;
+    var target = newIndex.clamp(0, _tabs.length);
+    if (oldIndex < target) target -= 1;
+    if (oldIndex == target) return;
+
+    _userModifiedTabs = true;
+    final moved = _tabs.removeAt(oldIndex);
+    _tabs.insert(target.clamp(0, _tabs.length), moved);
+    _persistTabs();
+    notifyListeners();
+  }
+
+  /// Splits the viewport along [axis] to show two tabs simultaneously.
+  ///
+  /// When [tabId] matches the current pane tab and only one tab exists, a
+  /// duplicate tab is created automatically for the second pane.
+  void splitWithTab(
+    String tabId,
+    LogSplitAxis axis, {
+    bool putInPrimary = false,
+  }) {
+    if (axis == LogSplitAxis.none) {
+      closeSplit();
+      return;
+    }
+    if (_tabByIdOrNull(tabId) == null) return;
+
+    _saveActiveTabFields();
+    _userModifiedTabs = true;
+
+    if (putInPrimary) {
+      final previousPrimary = _pane0TabId;
+      String secondId;
+      if (previousPrimary != tabId) {
+        secondId = previousPrimary;
+      } else {
+        secondId = _findOrCreateSiblingTabId(tabId);
+      }
+      _pane0TabId = tabId;
+      _pane1TabId = secondId;
+      _splitAxis = axis;
+      _focusedPane = 0;
+      _activeTabId = tabId;
+    } else {
+      String secondId = tabId;
+      if (secondId == _pane0TabId) {
+        secondId = _findOrCreateSiblingTabId(tabId);
+      }
+      _pane1TabId = secondId;
+      _splitAxis = axis;
+      _focusedPane = 1;
+      _activeTabId = secondId;
+    }
+
+    _loadTabFields(activeTab);
+    _syncPaneLinesFromBuffer(0);
+    _syncPaneLinesFromBuffer(1);
+    _recomputeAllPanes();
+    _persistTabs();
+  }
+
+  String _findOrCreateSiblingTabId(String excludeTabId) {
+    for (final t in _tabs) {
+      if (t.id != excludeTabId) return t.id;
+    }
+    final num = _nextTabCounter++;
+    final id = 'tab_$num';
+    final base = _tabById(excludeTabId);
+    _tabs.add(
+      base.copyWith(
+        id: id,
+        title: 'Logcat $num',
+        isCustomTitle: false,
+        paused: false,
+      ),
+    );
+    return id;
+  }
+
+  /// Toggles side-by-side split view on or off.
+  void toggleSplit([LogSplitAxis axis = LogSplitAxis.horizontal]) {
+    if (isSplit) {
+      closeSplit();
+    } else {
+      splitWithTab(activeTabId, axis);
+    }
+  }
+
+  /// Closes the secondary split pane while keeping the focused tab open.
+  void closeSplit() {
+    if (!isSplit) return;
+    _saveActiveTabFields();
+    if (_focusedPane == 1 && _pane1TabId != null) {
+      _pane0TabId = _pane1TabId!;
+    }
+    _pane1TabId = null;
+    _splitAxis = LogSplitAxis.none;
+    _focusedPane = 0;
+    _activeTabId = _pane0TabId;
+    _loadTabFields(activeTab);
+    _syncPaneLinesFromBuffer(0);
+    _recomputePane(0);
+    _persistTabs();
+  }
+
+  void setSplitRatio(double ratio) {
+    final clamped = ratio.clamp(0.2, 0.8);
+    if ((_splitRatio - clamped).abs() < 0.001) return;
+    _splitRatio = clamped;
+    notifyListeners();
+  }
+
+  /// Focuses pane [paneIndex] (`0` = primary, `1` = secondary) so toolbars and
+  /// filters bind to that pane's tab.
+  void focusPane(int paneIndex) {
+    if (!isSplit) return;
+    if (paneIndex != 0 && paneIndex != 1) return;
+    if (_focusedPane == paneIndex) return;
+
+    _saveActiveTabFields();
+    _focusedPane = paneIndex;
+    _activeTabId = paneIndex == 1 ? _pane1TabId! : _pane0TabId;
+    _loadTabFields(activeTab);
+
+    final nextSerial = activeTabSerial;
+    if (nextSerial != null && nextSerial != _deviceController.activeDevice) {
+      _deviceController.setActiveDevice(nextSerial);
+      sendCommand(DeviceCommand(nextSerial));
+    }
+    notifyListeners();
+  }
+
+  /// Switches the focused pane to [tabId], or moves focus if [tabId] is already
+  /// shown in the other split pane.
   void selectTab(String tabId) {
-    final targetIdx = _tabs.indexWhere((t) => t.id == tabId);
-    if (targetIdx < 0) return;
+    final target = _tabByIdOrNull(tabId);
+    if (target == null) return;
+
+    if (isSplit) {
+      if (_focusedPane == 0 && _pane1TabId == tabId) {
+        focusPane(1);
+        return;
+      }
+      if (_focusedPane == 1 && _pane0TabId == tabId) {
+        focusPane(0);
+        return;
+      }
+    }
+
     if (_activeTabId == tabId) return;
 
     _userModifiedTabs = true;
@@ -647,7 +895,11 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
     final prevSerial = activeTabSerial;
     _activeTabId = tabId;
-    final target = _tabs[targetIdx];
+    if (_focusedPane == 1 && isSplit) {
+      _pane1TabId = tabId;
+    } else {
+      _pane0TabId = tabId;
+    }
     _loadTabFields(target);
 
     final nextSerial = _effectiveSerialFor(target);
@@ -667,17 +919,19 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
 
-    _syncLinesFromActiveBuffer();
-    _recompute();
+    final paneIdx = _focusedPane == 1 && isSplit ? 1 : 0;
+    _syncPaneLinesFromBuffer(paneIdx);
+    _recomputePane(paneIdx);
 
     if (_autoScroll) {
-      scrollToBottom();
+      scrollToBottom(paneIdx);
     } else {
       final offset = target.scrollOffset;
+      final slot = paneIdx == 1 ? _pane1 : _pane0;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (scrollController.hasClients) {
-          final max = scrollController.position.maxScrollExtent;
-          scrollController.jumpTo(offset.clamp(0.0, max));
+        if (slot.scrollController.hasClients) {
+          final max = slot.scrollController.position.maxScrollExtent;
+          slot.scrollController.jumpTo(offset.clamp(0.0, max));
         }
       });
     }
@@ -709,6 +963,35 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     if (idx < 0) return;
 
     _userModifiedTabs = true;
+
+    if (isSplit) {
+      if (_pane1TabId == tabId) {
+        _tabs.removeAt(idx);
+        _pane1TabId = null;
+        _splitAxis = LogSplitAxis.none;
+        _focusedPane = 0;
+        _activeTabId = _pane0TabId;
+        _loadTabFields(activeTab);
+        _syncPaneLinesFromBuffer(0);
+        _recomputePane(0);
+        _persistTabs();
+        return;
+      }
+      if (_pane0TabId == tabId) {
+        _tabs.removeAt(idx);
+        _pane0TabId = _pane1TabId!;
+        _pane1TabId = null;
+        _splitAxis = LogSplitAxis.none;
+        _focusedPane = 0;
+        _activeTabId = _pane0TabId;
+        _loadTabFields(activeTab);
+        _syncPaneLinesFromBuffer(0);
+        _recomputePane(0);
+        _persistTabs();
+        return;
+      }
+    }
+
     if (_activeTabId == tabId) {
       final fallbackIdx = idx > 0 ? idx - 1 : 1;
       selectTab(_tabs[fallbackIdx].id);
@@ -721,6 +1004,12 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   void closeOtherTabs(String tabId) {
     if (!_tabs.any((t) => t.id == tabId) || _tabs.length <= 1) return;
     _userModifiedTabs = true;
+    if (isSplit) {
+      _pane1TabId = null;
+      _splitAxis = LogSplitAxis.none;
+      _focusedPane = 0;
+    }
+    _pane0TabId = tabId;
     if (_activeTabId != tabId) {
       selectTab(tabId);
     }
@@ -738,6 +1027,11 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       selectTab(tabId);
     }
     _tabs.removeRange(idx + 1, _tabs.length);
+    if (_pane1TabId != null && _tabByIdOrNull(_pane1TabId!) == null) {
+      _pane1TabId = null;
+      _splitAxis = LogSplitAxis.none;
+      _focusedPane = 0;
+    }
     _persistTabs();
     notifyListeners();
   }
@@ -758,8 +1052,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  /// Changes the target device serial for the currently active tab without
-  /// altering other tabs' target devices.
+  /// Changes the target device serial for the currently focused tab.
   void setTabDevice(String? serial) {
     _userModifiedTabs = true;
     final normalized = (serial == null || serial.isEmpty) ? null : serial;
@@ -776,19 +1069,16 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       sendCommand(const DeviceCommand(null));
     }
 
-    _syncLinesFromActiveBuffer();
-    _recompute();
+    final paneIdx = _focusedPane == 1 && isSplit ? 1 : 0;
+    _syncPaneLinesFromBuffer(paneIdx);
+    _recomputePane(paneIdx);
     _persistTabs();
   }
 
-  /// Switches to a tab showing [serial] (creating one if none exists yet),
-  /// preserving backward compatibility with device-level navigation.
   void selectDeviceTab(String serial) {
     final currentEffective = activeTabSerial;
     if (currentEffective == serial && activeTab.deviceSerial == serial) return;
 
-    // Pin the current tab to its active serial before switching away so its
-    // filter state stays bound to that device.
     if (activeTab.deviceSerial == null && currentEffective != null) {
       activeTab.deviceSerial = currentEffective;
     }
@@ -805,12 +1095,10 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
-    // If the sole tab has no device pinned and no logs/filters yet, reuse it;
-    // otherwise open a dedicated tab for the target device.
     final isFreshSingleTab =
         _tabs.length == 1 &&
         activeTab.deviceSerial == null &&
-        _lines.isEmpty &&
+        _focusedSlot.lines.isEmpty &&
         _search.isEmpty &&
         pkgController.text.trim().isEmpty;
     if (isFreshSingleTab) {
@@ -828,48 +1116,50 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     _deviceController.toggleViewMode();
   }
 
-  void _updateFilterCache() {
-    _cachedMinRank = switch (_minLevel) {
+  void _updateFilterCache(_LogPaneSlot slot, LogTabState tab) {
+    slot.cachedMinRank = switch (tab.minLevel) {
       'V' => 0,
       'D' => 1,
       'I' => 2,
       'W' => 3,
       'E' => 4,
       'F' || 'S' => 5,
-      _ => kLevels.indexOf(_minLevel).clamp(0, kLevels.length - 1),
+      _ => kLevels.indexOf(tab.minLevel).clamp(0, kLevels.length - 1),
     };
-    _cachedQuery = LogQuery(_search, useRegex: _useRegex);
+    slot.cachedQuery = LogQuery(tab.search, useRegex: tab.useRegex);
   }
 
-  void _trimVisibleToBufferStart() {
-    if (_visible.isEmpty || _lines.isEmpty) return;
-    final minSeq = _lines.first.seq;
+  void _trimVisibleToBufferStart(_LogPaneSlot slot) {
+    if (slot.visible.isEmpty || slot.lines.isEmpty) return;
+    final minSeq = slot.lines.first.seq;
     var trimCount = 0;
-    while (trimCount < _visible.length && _visible[trimCount].seq < minSeq) {
+    while (trimCount < slot.visible.length &&
+        slot.visible[trimCount].seq < minSeq) {
       trimCount++;
     }
     if (trimCount > 0) {
-      _visible.removeRange(0, trimCount);
+      slot.visible.removeRange(0, trimCount);
     }
   }
 
-  void _publishVisibleAndStats() {
-    // UnmodifiableListView wraps _visible in O(1) without copying the list.
-    visibleNotifier.value = UnmodifiableListView<LogEntry>(_visible);
-    statsNotifier.value = (
-      total: _lines.length,
-      visible: _visible.length,
-      hiddenNoise: _hiddenNoiseCount,
+  void _publishPaneVisibleAndStats(_LogPaneSlot slot) {
+    slot.visibleNotifier.value = UnmodifiableListView<LogEntry>(slot.visible);
+    slot.statsNotifier.value = (
+      total: slot.lines.length,
+      visible: slot.visible.length,
+      hiddenNoise: slot.hiddenNoiseCount,
     );
   }
 
   bool _matchesEntry(
     LogEntry e, {
+    required LogTabState tab,
+    required _LogPaneSlot slot,
     required String currentPkg,
     required int? tabAppPid,
     required bool isNoise,
   }) {
-    if (e.rank < _cachedMinRank) return false;
+    if (e.rank < slot.cachedMinRank) return false;
 
     if (currentPkg.isNotEmpty) {
       final lowerPkg = currentPkg.toLowerCase();
@@ -879,15 +1169,15 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       if (!matchesPkg && !matchesPid) return false;
     }
 
-    if (!_cachedQuery.hasNoiseTerm) {
-      if (_noiseMode == NoiseFilterMode.reduce && isNoise) {
+    if (!slot.cachedQuery.hasNoiseTerm) {
+      if (tab.noiseMode == NoiseFilterMode.reduce && isNoise) {
         return false;
-      } else if (_noiseMode == NoiseFilterMode.onlyNoise && !isNoise) {
+      } else if (tab.noiseMode == NoiseFilterMode.onlyNoise && !isNoise) {
         return false;
       }
     }
 
-    for (final term in _cachedQuery.terms) {
+    for (final term in slot.cachedQuery.terms) {
       final field = term.field;
       final matched = switch (field) {
         'tag' => term.matches(e.tag),
@@ -922,19 +1212,35 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _recompute() {
-    _updateFilterCache();
-    _visible.clear();
+    _recomputePane(_focusedPane == 1 && isSplit ? 1 : 0);
+  }
+
+  void _recomputeAllPanes() {
+    _recomputePane(0, notifyController: false);
+    if (isSplit) {
+      _recomputePane(1, notifyController: false);
+    }
+    notifyListeners();
+  }
+
+  void _recomputePane(int paneIndex, {bool notifyController = true}) {
+    final tab = paneIndex == 1 ? secondaryTab : primaryTab;
+    if (tab == null) return;
+    final slot = paneIndex == 1 ? _pane1 : _pane0;
+
+    _updateFilterCache(slot, tab);
+    slot.visible.clear();
     int hidden = 0;
-    final isReduced = _noiseMode == NoiseFilterMode.reduce;
+    final isReduced = tab.noiseMode == NoiseFilterMode.reduce;
     final needsNoiseCheck =
         isReduced ||
-        _noiseMode == NoiseFilterMode.onlyNoise ||
-        _cachedQuery.hasNoiseTerm;
-    final currentPkg = pkgController.text.trim();
-    final currentAppPid = appPid;
-    final clearedAfter = activeTab.clearedAfterSeq;
+        tab.noiseMode == NoiseFilterMode.onlyNoise ||
+        slot.cachedQuery.hasNoiseTerm;
+    final currentPkg = tab.packageFilter.trim();
+    final currentAppPid = appPidForTab(tab);
+    final clearedAfter = tab.clearedAfterSeq;
 
-    for (final e in _lines) {
+    for (final e in slot.lines) {
       if (clearedAfter != null && e.seq <= clearedAfter) continue;
       final isNoise =
           needsNoiseCheck
@@ -946,21 +1252,25 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
               : false;
       if (_matchesEntry(
         e,
+        tab: tab,
+        slot: slot,
         currentPkg: currentPkg,
         tabAppPid: currentAppPid,
         isNoise: isNoise,
       )) {
-        _visible.add(e);
+        slot.visible.add(e);
       } else if (isReduced && isNoise) {
         hidden++;
       }
     }
-    _hiddenNoiseCount = hidden;
-    _publishVisibleAndStats();
-    notifyListeners();
+    slot.hiddenNoiseCount = hidden;
+    _publishPaneVisibleAndStats(slot);
+    if (notifyController) {
+      notifyListeners();
+    }
   }
 
-  // User Actions
+  // User Actions (scoped to the active/focused tab)
   void setNoiseMode(NoiseFilterMode mode) {
     if (_noiseMode == mode) return;
     _noiseMode = mode;
@@ -1010,12 +1320,14 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   void togglePaused() {
     _paused = !_paused;
     activeTab.paused = _paused;
+    final paneIdx = _focusedPane == 1 && isSplit ? 1 : 0;
+    final slot = _focusedSlot;
     if (_paused) {
-      activeTab.pausedBufferSnapshot = List<LogEntry>.of(_lines);
+      activeTab.pausedBufferSnapshot = List<LogEntry>.of(slot.lines);
     } else {
       activeTab.pausedBufferSnapshot = null;
-      _syncLinesFromActiveBuffer();
-      _recompute();
+      _syncPaneLinesFromBuffer(paneIdx);
+      _recomputePane(paneIdx);
       return;
     }
     notifyListeners();
@@ -1058,12 +1370,13 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       sendCommand(ClearCommand(serial: activeTabSerial));
       return;
     }
-    if (_lines.isNotEmpty) {
-      activeTab.clearedAfterSeq = _lines.last.seq;
+    final slot = _focusedSlot;
+    if (slot.lines.isNotEmpty) {
+      activeTab.clearedAfterSeq = slot.lines.last.seq;
     }
     if (activeTab.paused) {
       activeTab.pausedBufferSnapshot = [];
-      _lines.clear();
+      slot.lines.clear();
     }
     _recompute();
   }
@@ -1116,15 +1429,14 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     applyPackage();
   }
 
-  String _formatEntry(LogEntry e, String currentPkg) {
+  String _formatEntry(LogEntry e, String currentPkg, [int? currentAppPid]) {
     final parts = <String>[];
-    final currentAppPid = appPid;
+    final pidVal = currentAppPid ?? appPid;
     if (_columns.showTime) parts.add(e.time);
     if (_columns.showPidTid) parts.add('${e.pid}-${e.tid}');
     if (_columns.showPackage) {
       final pkg =
-          e.pkg ??
-          (currentAppPid != null && e.pid == currentAppPid ? currentPkg : null);
+          e.pkg ?? (pidVal != null && e.pid == pidVal ? currentPkg : null);
       if (pkg != null && pkg.isNotEmpty) parts.add(pkg);
     }
     if (_columns.showLevel && _columns.showTag) {
@@ -1140,7 +1452,7 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   Future<String> exportLogs() async {
     final buf = StringBuffer();
     final currentPkg = pkgController.text.trim();
-    for (final e in _visible) {
+    for (final e in _focusedSlot.visible) {
       buf.writeln(_formatEntry(e, currentPkg));
     }
     final stamp = DateTime.now().toIso8601String().replaceAll(
@@ -1152,9 +1464,12 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     return exportLog(buf.toString(), filename);
   }
 
-  void copyLogEntry(LogEntry e) {
+  void copyLogEntry(LogEntry e, {LogTabState? tab}) {
+    final t = tab ?? activeTab;
     Clipboard.setData(
-      ClipboardData(text: _formatEntry(e, pkgController.text.trim())),
+      ClipboardData(
+        text: _formatEntry(e, t.packageFilter.trim(), appPidForTab(t)),
+      ),
     );
   }
 
@@ -1168,12 +1483,10 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     _searchDebounce?.cancel();
     _sub?.cancel();
     _channel?.sink.close();
-    scrollController.removeListener(_onScroll);
-    scrollController.dispose();
+    _pane0.dispose();
+    _pane1.dispose();
     searchController.dispose();
     pkgController.dispose();
-    visibleNotifier.dispose();
-    statsNotifier.dispose();
     stopBridge();
     super.dispose();
   }

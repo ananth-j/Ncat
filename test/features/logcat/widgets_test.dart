@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thruwire/features/devices/device_controller.dart';
 import 'package:thruwire/features/devices/models/device_info.dart';
+import 'package:thruwire/features/logcat/logcat_controller.dart'
+    show LogSplitAxis;
 import 'package:thruwire/features/logcat/models/log_entry.dart';
 import 'package:thruwire/features/logcat/models/log_tab_state.dart';
 import 'package:thruwire/features/logcat/models/noise_filter.dart';
@@ -296,6 +298,8 @@ void main() {
         String? selectedTab;
         String? closedTab;
         String? duplicatedTab;
+        LogSplitAxis? toggledSplit;
+        (String, LogSplitAxis)? splitWith;
         bool added = false;
 
         final tabs = [
@@ -330,6 +334,8 @@ void main() {
               onRenameTab: (_, __) {},
               onCloseOtherTabs: (_) {},
               onCloseTabsToRight: (_) {},
+              onSplitWithTab: (id, axis) => splitWith = (id, axis),
+              onToggleSplit: (axis) => toggledSplit = axis,
               onToggleViewMode: () {},
             ),
           ),
@@ -361,9 +367,25 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.text('Duplicate Tab'), findsOneWidget);
+        expect(find.text('Split Right (Side-by-Side)'), findsOneWidget);
         await tester.tap(find.text('Duplicate Tab'));
         await tester.pumpAndSettle();
         expect(duplicatedTab, 'tab_1');
+
+        // Split Right button in tab bar triggers onToggleSplit
+        await tester.tap(find.byIcon(Icons.vertical_split_outlined));
+        await tester.pump();
+        expect(toggledSplit, LogSplitAxis.horizontal);
+
+        // Context menu Split Right triggers onSplitWithTab
+        await tester.tapAt(
+          tester.getCenter(find.text('Errors')),
+          buttons: 2,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Split Right (Side-by-Side)'));
+        await tester.pumpAndSettle();
+        expect(splitWith, ('tab_2', LogSplitAxis.horizontal));
       },
     );
   });

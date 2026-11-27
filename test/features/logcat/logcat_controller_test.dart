@@ -587,5 +587,68 @@ void main() {
       expect(restored.noiseMode, NoiseFilterMode.showAll);
       expect(restored.wrap, isFalse);
     });
+
+    test('split view streams two tabs simultaneously and supports focus, resize, reorder', () {
+      controller.handleMessage(
+        const StatusMessage(
+          status: 'connected',
+          devices: [DeviceInfo(serial: 'dev-1', authorized: true)],
+          activeDevice: 'dev-1',
+        ),
+      );
+
+      final tab1Id = controller.activeTabId;
+      controller.setFilterPackage('com.app.one');
+
+      final tab2Id = controller.addTab(deviceSerial: 'dev-1');
+      controller.setMinLevel('E');
+
+      // Reorder tab2 before tab1
+      controller.reorderTab(tab2Id, 0);
+      expect(controller.logTabs.first.id, tab2Id);
+      expect(controller.logTabs.last.id, tab1Id);
+
+      // Split horizontally showing tab2 (left) and tab1 (right)
+      controller.selectTab(tab2Id);
+      controller.splitWithTab(tab1Id, LogSplitAxis.horizontal);
+      expect(controller.isSplit, isTrue);
+      expect(controller.primaryTab.id, tab2Id);
+      expect(controller.secondaryTab?.id, tab1Id);
+      expect(controller.focusedPane, 1);
+
+      // Resize split ratio (clamped 0.2..0.8)
+      controller.setSplitRatio(0.95);
+      expect(controller.splitRatio, 0.8);
+      controller.setSplitRatio(0.35);
+      expect(controller.splitRatio, 0.35);
+
+      // Incoming batch updates BOTH split panes simultaneously with independent filters
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(1, 'D', 'TagA', 'Debug app1', pkg: 'com.app.one', pid: 101),
+          createEntry(2, 'E', 'TagB', 'Error app2', pkg: 'com.app.two', pid: 202),
+          createEntry(3, 'E', 'TagA', 'Error app1', pkg: 'com.app.one', pid: 101),
+        ], serial: 'dev-1'),
+      );
+
+      // Pane 0 (tab2: minLevel E) sees both errors (2 lines)
+      expect(controller.primaryVisible.length, 2);
+      // Pane 1 (tab1: package com.app.one) sees both app.one lines (2 lines: Debug + Error)
+      expect(controller.secondaryVisible.length, 2);
+      expect(
+        controller.secondaryVisible.every((e) => e.pkg == 'com.app.one'),
+        isTrue,
+      );
+
+      // Focusing pane 0 switches activeTabId & top bar fields to tab2
+      controller.focusPane(0);
+      expect(controller.focusedPane, 0);
+      expect(controller.activeTabId, tab2Id);
+      expect(controller.minLevel, 'E');
+
+      controller.closeSplit();
+      expect(controller.isSplit, isFalse);
+      expect(controller.activeTabId, tab2Id);
+    });
   });
 }
