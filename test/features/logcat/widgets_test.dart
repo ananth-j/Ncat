@@ -3,15 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:thruwire/features/devices/device_controller.dart';
 import 'package:thruwire/features/devices/models/device_info.dart';
 import 'package:thruwire/features/logcat/logcat_controller.dart'
-    show LogSplitAxis;
+    show LogSplitAxis, LogcatController;
 import 'package:thruwire/features/logcat/models/log_entry.dart';
 import 'package:thruwire/features/logcat/models/log_tab_state.dart';
 import 'package:thruwire/features/logcat/models/noise_filter.dart';
 import 'package:thruwire/features/logcat/widgets/left_vertical_toolbar.dart';
 import 'package:thruwire/features/logcat/widgets/log_row.dart';
 import 'package:thruwire/features/logcat/widgets/log_tab_bar.dart';
+import 'package:thruwire/features/logcat/widgets/log_tab_pane.dart';
 import 'package:thruwire/features/logcat/widgets/status_bar.dart';
 import 'package:thruwire/features/logcat/widgets/top_filter_bar.dart';
+import 'package:thruwire/protocol/messages.dart';
 import 'package:thruwire/src/column_config.dart';
 import 'package:thruwire/src/palette.dart';
 
@@ -386,6 +388,104 @@ void main() {
         await tester.tap(find.text('Split Right (Side-by-Side)'));
         await tester.pumpAndSettle();
         expect(splitWith, ('tab_2', LogSplitAxis.horizontal));
+      },
+    );
+  });
+
+  group('LogTabPane Widget Tests', () {
+    testWidgets(
+      'split panes own independent filter bars and log toolbars without overflow',
+      (tester) async {
+        setDesktopSize(tester);
+
+        final controller = LogcatController();
+        addTearDown(controller.dispose);
+
+        controller.handleMessage(
+          const StatusMessage(
+            status: 'connected',
+            devices: [
+              DeviceInfo(serial: 'dev-1', model: 'Pixel 8', authorized: true),
+            ],
+            activeDevice: 'dev-1',
+          ),
+        );
+        controller.handleMessage(
+          const LogBatchMessage([
+            LogEntry(
+              seq: 1,
+              time: '10-18 10:00:00.000',
+              pid: 100,
+              tid: 100,
+              level: 'I',
+              tag: 'TagOne',
+              msg: 'Message one',
+            ),
+            LogEntry(
+              seq: 2,
+              time: '10-18 10:00:01.000',
+              pid: 200,
+              tid: 200,
+              level: 'E',
+              tag: 'TagTwo',
+              msg: 'Error two',
+            ),
+          ], serial: 'dev-1'),
+        );
+
+        final tab1Id = controller.activeTabId;
+        final tab2Id = controller.addTab(deviceSerial: 'dev-1');
+        controller.splitWithTab(tab1Id, LogSplitAxis.horizontal);
+
+        await tester.pumpWidget(
+          wrapWithTheme(
+            ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: LogTabPane(
+                        controller: controller,
+                        tab: controller.primaryTab,
+                        paneIndex: 0,
+                        isSplit: true,
+                        isFocused: controller.focusedPane == 0,
+                        isSecondary: false,
+                        onNotify: (_, {bool isError = false}) {},
+                        onExportTab: (_) async {},
+                      ),
+                    ),
+                    Expanded(
+                      child: LogTabPane(
+                        controller: controller,
+                        tab: controller.secondaryTab!,
+                        paneIndex: 1,
+                        isSplit: true,
+                        isFocused: controller.focusedPane == 1,
+                        isSecondary: true,
+                        onNotify: (_, {bool isError = false}) {},
+                        onExportTab: (_) async {},
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+
+        // Both panes render their own filter bar + clear button + log table
+        expect(find.byType(TopFilterBar), findsNWidgets(2));
+        expect(find.byIcon(Icons.delete_sweep_outlined), findsNWidgets(2));
+
+        // Clicking Clear on the first pane clears only tab1 without clearing tab2
+        await tester.tap(find.byIcon(Icons.delete_sweep_outlined).first);
+        await tester.pump();
+
+        expect(controller.primaryTab.visible, isEmpty);
+        expect(controller.secondaryTab!.visible.length, 2);
+        expect(tab1Id != tab2Id, isTrue);
       },
     );
   });

@@ -44,43 +44,74 @@ class TopFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: palette.panel,
-        border: Border(bottom: BorderSide(color: palette.border)),
-      ),
-      child: Row(
-        children: [
-          // Device selector dropdown
-          DevicePicker(
-            devices: devices,
-            pickedDevice: pickedDevice,
-            onDeviceChanged: onDevice,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 700;
+        return Container(
+          height: isCompact ? 86 : 48,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: palette.panel,
+            border: Border(bottom: BorderSide(color: palette.border)),
           ),
-          const SizedBox(width: 8),
-
-          // Process / package filter field
-          _processField(palette),
-          const SizedBox(width: 8),
-
-          // Noise reduction mode selector
-          _noiseField(palette),
-          const SizedBox(width: 8),
-
-          // Unified search input with regex and clear
-          _searchField(palette),
-          const SizedBox(width: 8),
-
-          // Level dropdown (Verbose, Debug, Info, Warn, Error, Assert)
-          _levelDropdown(palette),
-        ],
-      ),
+          child:
+              isCompact
+                  ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: DevicePicker(
+                              devices: devices,
+                              pickedDevice: pickedDevice,
+                              onDeviceChanged: onDevice,
+                              expanded: true,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            flex: 3,
+                            child: _processField(palette, width: double.infinity),
+                          ),
+                          const SizedBox(width: 6),
+                          _levelDropdown(palette, width: 112),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _searchField(palette),
+                          const SizedBox(width: 6),
+                          _noiseField(palette, compact: true),
+                        ],
+                      ),
+                    ],
+                  )
+                  : Row(
+                    children: [
+                      DevicePicker(
+                        devices: devices,
+                        pickedDevice: pickedDevice,
+                        onDeviceChanged: onDevice,
+                      ),
+                      const SizedBox(width: 8),
+                      _processField(palette),
+                      const SizedBox(width: 8),
+                      _noiseField(palette),
+                      const SizedBox(width: 8),
+                      _searchField(palette),
+                      const SizedBox(width: 8),
+                      _levelDropdown(palette),
+                    ],
+                  ),
+        );
+      },
     );
   }
 
-  Widget _noiseField(AppPalette palette) {
+  Widget _noiseField(AppPalette palette, {bool compact = false}) {
     final isReduced = noiseMode == NoiseFilterMode.reduce;
     final isOnlyNoise = noiseMode == NoiseFilterMode.onlyNoise;
 
@@ -233,9 +264,11 @@ class TopFilterBar extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text(
-              isReduced
-                  ? 'Noise: Reduced'
-                  : (isOnlyNoise ? 'Noise: Only' : 'Noise: All'),
+              compact
+                  ? (isReduced ? 'Reduced' : (isOnlyNoise ? 'Noise' : 'All'))
+                  : (isReduced
+                      ? 'Noise: Reduced'
+                      : (isOnlyNoise ? 'Noise: Only' : 'Noise: All')),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: (isReduced || isOnlyNoise)
@@ -252,10 +285,10 @@ class TopFilterBar extends StatelessWidget {
     );
   }
 
-  Widget _processField(AppPalette palette) {
+  Widget _processField(AppPalette palette, {double width = 185}) {
     return SizedBox(
       height: 32,
-      width: 185,
+      width: width,
       child: TextField(
         expands: true,
         minLines: null,
@@ -440,9 +473,9 @@ class TopFilterBar extends StatelessWidget {
     );
   }
 
-  Widget _levelDropdown(AppPalette palette) {
+  Widget _levelDropdown(AppPalette palette, {double width = 135}) {
     return Container(
-      width: 135,
+      width: width,
       height: 32,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
@@ -454,6 +487,7 @@ class TopFilterBar extends StatelessWidget {
         child: DropdownButton<String>(
           value: minLevel,
           isDense: true,
+          isExpanded: true,
           dropdownColor: palette.panel,
           icon: Icon(Icons.arrow_drop_down, size: 16, color: palette.dim),
           items:
@@ -473,9 +507,12 @@ class TopFilterBar extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 7),
-                      Text(
-                        kLevelNames[l] ?? l,
-                        style: TextStyle(fontSize: 12, color: palette.text),
+                      Flexible(
+                        child: Text(
+                          kLevelNames[l] ?? l,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: palette.text),
+                        ),
                       ),
                     ],
                   ),

@@ -87,51 +87,76 @@ class _LogTableViewState extends State<LogTableView> {
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return Column(
-      children: [
-        _columnHeader(context, palette),
-        Expanded(
-          child: Stack(
-            children: [
-              _logListOuter(context, palette),
-              if (!widget.autoScroll)
-                Positioned(
-                  right: 18,
-                  bottom: 18,
-                  child: Tooltip(
-                    message: 'Scroll to end',
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 680;
+        final minTableWidth = compact ? 480.0 : 0.0;
+        final table = Column(
+          children: [
+            _columnHeader(context, palette, compact: compact),
+            Expanded(
+              child: Stack(
+                children: [
+                  _logListOuter(context, palette, compact: compact),
+                  if (!widget.autoScroll)
+                    Positioned(
+                      right: 18,
+                      bottom: 18,
+                      child: Tooltip(
+                        message: 'Scroll to end',
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: palette.accent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          onPressed: widget.onScrollToEnd,
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.arrow_downward, size: 14),
+                              SizedBox(width: 4),
+                              Text(
+                                'Scroll to end',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ],
+                          ),
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      onPressed: widget.onScrollToEnd,
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.arrow_downward, size: 14),
-                          SizedBox(width: 4),
-                          Text('Scroll to end', style: TextStyle(fontSize: 11)),
-                        ],
                       ),
                     ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
+                ],
+              ),
+            ),
+          ],
+        );
+
+        if (constraints.maxWidth < minTableWidth) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: minTableWidth,
+              height: constraints.maxHeight,
+              child: table,
+            ),
+          );
+        }
+        return table;
+      },
     );
   }
 
-  Widget _columnHeader(BuildContext context, AppPalette palette) {
+  Widget _columnHeader(
+    BuildContext context,
+    AppPalette palette, {
+    bool compact = false,
+  }) {
     const headerStyle = TextStyle(
       fontSize: 10,
       fontWeight: FontWeight.w700,
@@ -149,7 +174,7 @@ class _LogTableViewState extends State<LogTableView> {
         children: [
           if (columns.showTime) ...[
             SizedBox(
-              width: 110,
+              width: compact ? 96 : 110,
               child: Text(
                 'TIME',
                 style: headerStyle.copyWith(color: palette.dim),
@@ -159,7 +184,7 @@ class _LogTableViewState extends State<LogTableView> {
           ],
           if (columns.showPidTid) ...[
             SizedBox(
-              width: 82,
+              width: compact ? 68 : 82,
               child: Text(
                 'PID-TID',
                 style: headerStyle.copyWith(color: palette.dim),
@@ -169,7 +194,7 @@ class _LogTableViewState extends State<LogTableView> {
           ],
           if (columns.showPackage) ...[
             SizedBox(
-              width: 140,
+              width: compact ? 88 : 140,
               child: Text(
                 'PACKAGE',
                 style: headerStyle.copyWith(color: palette.dim),
@@ -189,7 +214,7 @@ class _LogTableViewState extends State<LogTableView> {
           ],
           if (columns.showTag) ...[
             SizedBox(
-              width: 140,
+              width: compact ? 88 : 140,
               child: Text(
                 'TAG',
                 style: headerStyle.copyWith(color: palette.dim),
@@ -200,6 +225,7 @@ class _LogTableViewState extends State<LogTableView> {
           Expanded(
             child: Text(
               'MESSAGE',
+              overflow: TextOverflow.ellipsis,
               style: headerStyle.copyWith(color: palette.dim),
             ),
           ),
@@ -221,11 +247,13 @@ class _LogTableViewState extends State<LogTableView> {
                     size: 14,
                     color: palette.dim,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Columns',
-                    style: TextStyle(fontSize: 11, color: palette.dim),
-                  ),
+                  if (!compact) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      'Columns',
+                      style: TextStyle(fontSize: 11, color: palette.dim),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -246,19 +274,30 @@ class _LogTableViewState extends State<LogTableView> {
   // ---------------------------------------------------------------------------
 
   /// Outer shell: decides whether to use [entriesNotifier] or [entries].
-  Widget _logListOuter(BuildContext context, AppPalette palette) {
+  Widget _logListOuter(
+    BuildContext context,
+    AppPalette palette, {
+    bool compact = false,
+  }) {
     final notifier = widget.entriesNotifier;
     if (notifier != null) {
       // Fast path: only the list rebuilds when new batches arrive.
       return ValueListenableBuilder<List<LogEntry>>(
         valueListenable: notifier,
-        builder: (context, entries, _) => _logListInner(context, palette, entries),
+        builder:
+            (context, entries, _) =>
+                _logListInner(context, palette, entries, compact: compact),
       );
     }
-    return _logListInner(context, palette, widget.entries);
+    return _logListInner(context, palette, widget.entries, compact: compact);
   }
 
-  Widget _logListInner(BuildContext context, AppPalette palette, List<LogEntry> entries) {
+  Widget _logListInner(
+    BuildContext context,
+    AppPalette palette,
+    List<LogEntry> entries, {
+    bool compact = false,
+  }) {
     if (entries.isEmpty) {
       return Center(
         child: Column(
@@ -309,6 +348,7 @@ class _LogTableViewState extends State<LogTableView> {
           entries: entries,
           scrollController: widget.scrollController,
           wrap: widget.wrap,
+          compact: compact,
           columns: widget.columns,
           appPid: widget.appPid,
           packageFilter: widget.packageFilter,
@@ -338,6 +378,7 @@ class _HoverIsolatedList extends StatelessWidget {
     required this.entries,
     required this.scrollController,
     required this.wrap,
+    required this.compact,
     required this.columns,
     required this.appPid,
     required this.packageFilter,
@@ -351,6 +392,7 @@ class _HoverIsolatedList extends StatelessWidget {
   final List<LogEntry> entries;
   final ScrollController scrollController;
   final bool wrap;
+  final bool compact;
   final LogColumnConfig columns;
   final int? appPid;
   final String packageFilter;
@@ -380,6 +422,7 @@ class _HoverIsolatedList extends StatelessWidget {
               entry: e,
               columns: columns,
               wrap: wrap,
+              compact: compact,
               appPid: appPid,
               packageFilter: packageFilter,
               hoveredSeq: hovered,

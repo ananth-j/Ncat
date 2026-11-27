@@ -8,15 +8,13 @@ import '../../mirroring/widgets/multi_screen_grid.dart';
 import '../../mirroring/widgets/screen_mirror_view.dart';
 import '../../mirroring/widgets/screenshot_dialog.dart';
 import '../logcat_controller.dart';
-import '../widgets/column_config_dialog.dart';
-import '../widgets/left_vertical_toolbar.dart';
+import '../widgets/global_device_rail.dart';
 import '../widgets/log_tab_bar.dart';
-import '../widgets/log_table_view.dart';
-import '../widgets/presets_dialog.dart';
+import '../widgets/log_tab_pane.dart';
 import '../widgets/status_bar.dart';
-import '../widgets/top_filter_bar.dart';
 
-/// Main desktop viewport displaying the toolbar, logcat grid, and status indicators.
+/// Main desktop viewport displaying the multi-tab Logcat console, optional
+/// split panes, and global device mirroring/capture rail.
 class LogcatPage extends StatefulWidget {
   const LogcatPage({
     super.key,
@@ -94,9 +92,9 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _handleExport() async {
+  Future<void> _handleExportTab(String tabId) async {
     try {
-      final result = await _controller.exportLogs();
+      final result = await _controller.exportLogsForTab(tabId);
       _notify(result);
     } catch (e) {
       _notify('export failed: $e', isError: true);
@@ -218,30 +216,7 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
           backgroundColor: palette.bg,
           body: Column(
             children: [
-              // Top horizontal filter bar - rebuilds on filter/device changes
-              ListenableBuilder(
-                listenable: _controller,
-                builder: (context, _) {
-                  return TopFilterBar(
-                    searchCtrl: _controller.searchController,
-                    pkgCtrl: _controller.pkgController,
-                    minLevel: _controller.minLevel,
-                    useRegex: _controller.useRegex,
-                    appPid: _controller.appPid,
-                    devices: _controller.devices,
-                    pickedDevice: _controller.pickedDevice,
-                    noiseMode: _controller.noiseMode,
-                    onSearch: (v) => _controller.setSearch(v, immediate: false),
-                    onLevel: _controller.setMinLevel,
-                    onPackage: _controller.applyPackage,
-                    onRegex: _controller.toggleRegex,
-                    onDevice: _controller.applyDevice,
-                    onNoiseMode: _controller.setNoiseMode,
-                  );
-                },
-              ),
-
-              // Multi-tab logcat bar (supports draggable tabs & split-view controls)
+              // Top Logcat tab bar (draggable tabs, new tab '+', split & grid controls)
               ListenableBuilder(
                 listenable: _controller,
                 builder: (context, _) {
@@ -271,7 +246,7 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                 },
               ),
 
-              // Main viewport area: either MultiScreenGrid or Logcat Console
+              // Main viewport area: MultiScreenGrid or self-contained LogTabPanes + global Mirror/Device Rail
               Expanded(
                 child: ListenableBuilder(
                   listenable: _controller,
@@ -295,61 +270,8 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Left vertical action toolbar with localized capture & mirror reactivity
-                        ListenableBuilder(
-                          listenable: Listenable.merge([
-                            _controller,
-                            _captureService.isRecording,
-                            _captureService.recordingDuration,
-                            _captureService.isTakingScreenshot,
-                            _mirrorController.isOpen,
-                          ]),
-                          builder: (context, _) {
-                            return LeftVerticalToolbar(
-                              paused: _controller.paused,
-                              wrap: _controller.wrap,
-                              atBottom: _controller.autoScroll,
-                              themeChoice: widget.themeChoice,
-                              onPause: _controller.togglePaused,
-                              onWrap: _controller.toggleWrap,
-                              onScrollToEnd: _controller.scrollToEnd,
-                              onScrollToTop: _controller.scrollToTop,
-                              onClear: _controller.clearLogs,
-                              onRestart: _controller.restartAdb,
-                              onExport: _handleExport,
-                              onScreenshot: _handleScreenshot,
-                              onToggleRecord: _handleToggleRecord,
-                              onToggleMirror:
-                                  () => _mirrorController.toggleOpen(
-                                    serial: _controller.activeDevice,
-                                  ),
-                              isMirrorOpen: _mirrorController.isOpen.value,
-                              isRecording: _captureService.isRecording.value,
-                              recordingDuration:
-                                  _captureService.recordingDuration.value,
-                              isTakingScreenshot:
-                                  _captureService.isTakingScreenshot.value,
-                              onPresets:
-                                  () => showPresetsDialog(
-                                    context: context,
-                                    presets: _controller.presets,
-                                    onApplyPreset: _controller.applyPreset,
-                                    onSavePreset: _controller.savePreset,
-                                    onDeletePreset: _controller.deletePreset,
-                                  ),
-                              onConfigureColumns:
-                                  () => showColumnConfigDialog(
-                                    context: context,
-                                    columns: _controller.columns,
-                                    onUpdateColumns: _controller.updateColumns,
-                                  ),
-                              onThemeChoice: widget.onThemeChoice,
-                            );
-                          },
-                        ),
-
-                        // Log entries table view (single pane or resizable split panes,
-                        // with drag-to-split drop target overlay).
+                        // Individual tab viewport (each tab owns its own filter bar,
+                        // log toolbar, log table, and status counters)
                         Expanded(
                           child: _SplitDropArea(
                             palette: palette,
@@ -364,7 +286,7 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                           ),
                         ),
 
-                        // Screen Mirror split view with adjustable divider
+                        // Global Screen Mirror split panel (independent of individual log tabs)
                         ValueListenableBuilder<bool>(
                           valueListenable: _mirrorController.isOpen,
                           builder: (context, isOpen, _) {
@@ -396,13 +318,41 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                             );
                           },
                         ),
+
+                        // Global Device Actions Rail (Screenshot, Record, Mirror, Theme)
+                        ListenableBuilder(
+                          listenable: Listenable.merge([
+                            _captureService.isRecording,
+                            _captureService.recordingDuration,
+                            _captureService.isTakingScreenshot,
+                            _mirrorController.isOpen,
+                          ]),
+                          builder: (context, _) {
+                            return GlobalDeviceRail(
+                              themeChoice: widget.themeChoice,
+                              onScreenshot: _handleScreenshot,
+                              onToggleRecord: _handleToggleRecord,
+                              onToggleMirror:
+                                  () => _mirrorController.toggleOpen(
+                                    serial: _controller.activeDevice,
+                                  ),
+                              onThemeChoice: widget.onThemeChoice,
+                              isMirrorOpen: _mirrorController.isOpen.value,
+                              isRecording: _captureService.isRecording.value,
+                              recordingDuration:
+                                  _captureService.recordingDuration.value,
+                              isTakingScreenshot:
+                                  _captureService.isTakingScreenshot.value,
+                            );
+                          },
+                        ),
                       ],
                     );
                   },
                 ),
               ),
 
-              // Bottom status bar - rebuilds on log/connection counts of focused pane
+              // Bottom global status bar
               ListenableBuilder(
                 listenable: Listenable.merge([
                   _controller,
@@ -439,11 +389,16 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
 
   Widget _buildLogViewport(AppPalette palette) {
     if (!_controller.isSplit) {
-      return _buildSinglePane(
-        paneIndex: 0,
+      return LogTabPane(
+        key: ValueKey('pane_0_${_controller.primaryTab.id}'),
+        controller: _controller,
         tab: _controller.primaryTab,
-        palette: palette,
-        showSplitHeader: false,
+        paneIndex: 0,
+        isSplit: false,
+        isFocused: true,
+        isSecondary: false,
+        onNotify: _notify,
+        onExportTab: _handleExportTab,
       );
     }
 
@@ -460,17 +415,27 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
           (available - 120.0).clamp(120.0, available),
         );
 
-        final firstPane = _buildSinglePane(
-          paneIndex: 0,
+        final firstPane = LogTabPane(
+          key: ValueKey('pane_0_${_controller.primaryTab.id}'),
+          controller: _controller,
           tab: _controller.primaryTab,
-          palette: palette,
-          showSplitHeader: true,
+          paneIndex: 0,
+          isSplit: true,
+          isFocused: _controller.focusedPane == 0,
+          isSecondary: false,
+          onNotify: _notify,
+          onExportTab: _handleExportTab,
         );
-        final secondPane = _buildSinglePane(
-          paneIndex: 1,
+        final secondPane = LogTabPane(
+          key: ValueKey('pane_1_${_controller.secondaryTab!.id}'),
+          controller: _controller,
           tab: _controller.secondaryTab!,
-          palette: palette,
-          showSplitHeader: true,
+          paneIndex: 1,
+          isSplit: true,
+          isFocused: _controller.focusedPane == 1,
+          isSecondary: true,
+          onNotify: _notify,
+          onExportTab: _handleExportTab,
         );
         final divider = _ResizableDivider(
           axis: isHorizontal ? Axis.horizontal : Axis.vertical,
@@ -502,195 +467,6 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
           ],
         );
       },
-    );
-  }
-
-  Widget _buildSinglePane({
-    required int paneIndex,
-    required LogTabState tab,
-    required AppPalette palette,
-    required bool showSplitHeader,
-  }) {
-    final isSecondary = paneIndex == 1;
-    final isFocused = !showSplitHeader || _controller.focusedPane == paneIndex;
-
-    final entries =
-        isSecondary ? _controller.secondaryVisible : _controller.primaryVisible;
-    final entriesNotifier =
-        isSecondary
-            ? _controller.secondaryVisibleNotifier
-            : _controller.primaryVisibleNotifier;
-    final statsNotifier =
-        isSecondary
-            ? _controller.secondaryStatsNotifier
-            : _controller.primaryStatsNotifier;
-    final scrollCtrl =
-        isSecondary
-            ? _controller.secondaryScrollController
-            : _controller.primaryScrollController;
-    final totalCount =
-        isSecondary
-            ? _controller.secondaryLines.length
-            : _controller.primaryLines.length;
-
-    final table = LogTableView(
-      entries: entries,
-      entriesNotifier: entriesNotifier,
-      statsNotifier: statsNotifier,
-      totalLinesCount: totalCount,
-      columns: _controller.columns,
-      wrap: tab.wrap,
-      autoScroll: tab.autoScroll,
-      scrollController: scrollCtrl,
-      appPid: _controller.appPidForTab(tab),
-      packageFilter: tab.packageFilter.trim(),
-      onCopy: (entry) {
-        _controller.copyLogEntry(entry, tab: tab);
-        _notify('Log line copied to clipboard');
-      },
-      onFilterTag: (tag) {
-        _controller.focusPane(paneIndex);
-        _controller.setFilterTag(tag);
-      },
-      onFilterPackage: (pkg) {
-        _controller.focusPane(paneIndex);
-        _controller.setFilterPackage(pkg);
-      },
-      onScrollToEnd: () => _controller.scrollToEnd(paneIndex),
-      onUpdateColumns: _controller.updateColumns,
-    );
-
-    if (!showSplitHeader) {
-      return table;
-    }
-
-    return Listener(
-      onPointerDown: (_) => _controller.focusPane(paneIndex),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: isFocused ? palette.accent.withValues(alpha: 0.7) : palette.border,
-          ),
-        ),
-        child: Column(
-          children: [
-            _SplitPaneHeader(
-              tab: tab,
-              tabs: _controller.logTabs,
-              isFocused: isFocused,
-              isSecondary: isSecondary,
-              palette: palette,
-              onFocus: () => _controller.focusPane(paneIndex),
-              onSelectTabForPane: (tabId) {
-                _controller.focusPane(paneIndex);
-                _controller.selectTab(tabId);
-              },
-              onCloseSplit: _controller.closeSplit,
-            ),
-            Expanded(child: table),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SplitPaneHeader extends StatelessWidget {
-  const _SplitPaneHeader({
-    required this.tab,
-    required this.tabs,
-    required this.isFocused,
-    required this.isSecondary,
-    required this.palette,
-    required this.onFocus,
-    required this.onSelectTabForPane,
-    required this.onCloseSplit,
-  });
-
-  final LogTabState tab;
-  final List<LogTabState> tabs;
-  final bool isFocused;
-  final bool isSecondary;
-  final AppPalette palette;
-  final VoidCallback onFocus;
-  final ValueChanged<String> onSelectTabForPane;
-  final VoidCallback onCloseSplit;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onFocus,
-      child: Container(
-        height: 26,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          color: isFocused ? palette.accentBg : palette.panel,
-          border: Border(bottom: BorderSide(color: palette.border)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isFocused ? palette.accent : palette.dim.withValues(alpha: 0.4),
-              ),
-            ),
-            const SizedBox(width: 6),
-            DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: tabs.any((t) => t.id == tab.id) ? tab.id : null,
-                isDense: true,
-                dropdownColor: palette.panel,
-                icon: Icon(Icons.arrow_drop_down, size: 15, color: palette.dim),
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: isFocused ? FontWeight.w600 : FontWeight.normal,
-                  color: palette.text,
-                ),
-                items: [
-                  for (final t in tabs)
-                    DropdownMenuItem<String>(
-                      value: t.id,
-                      child: Text(
-                        t.displayTitle,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-                onChanged: (id) {
-                  if (id != null) onSelectTabForPane(id);
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                [
-                  if (tab.deviceSerial != null) tab.deviceSerial!,
-                  if (tab.minLevel != 'V') '${tab.minLevel}+',
-                  if (tab.paused) 'PAUSED',
-                ].join(' · '),
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 10, color: palette.dim),
-              ),
-            ),
-            if (isSecondary)
-              Tooltip(
-                message: 'Close Split Pane',
-                child: InkWell(
-                  onTap: onCloseSplit,
-                  borderRadius: BorderRadius.circular(3),
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: Icon(Icons.close, size: 13, color: palette.dim),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -756,7 +532,8 @@ class _ResizableDividerState extends State<_ResizableDivider> {
               width: isHorizontal ? 2 : 28,
               height: isHorizontal ? 28 : 2,
               decoration: BoxDecoration(
-                color: active ? palette.accent : palette.dim.withValues(alpha: 0.5),
+                color:
+                    active ? palette.accent : palette.dim.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(1),
               ),
             ),

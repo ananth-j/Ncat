@@ -114,6 +114,7 @@ class LogRow extends StatelessWidget {
     this.packageFilter,
     this.hoveredSeq,
     this.onHover,
+    this.compact = false,
   });
 
   final LogEntry entry;
@@ -124,6 +125,7 @@ class LogRow extends StatelessWidget {
   final ValueChanged<String> onFilterPackage;
   final int? appPid;
   final String? packageFilter;
+  final bool compact;
 
   /// The sequence number of the currently hovered row (or `null`).
   final int? hoveredSeq;
@@ -282,11 +284,12 @@ class LogRow extends StatelessWidget {
                 // Time
                 if (columns.showTime) ...[
                   SizedBox(
-                    width: 110,
+                    width: compact ? 96 : 110,
                     child: Text(
                       entry.time,
                       style: styles.dimStyle85,
                       maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -294,11 +297,12 @@ class LogRow extends StatelessWidget {
                 // PID-TID
                 if (columns.showPidTid) ...[
                   SizedBox(
-                    width: 82,
+                    width: compact ? 68 : 82,
                     child: Text(
                       '${entry.pid}-${entry.tid}',
                       style: styles.dimStyle70,
                       maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -306,7 +310,7 @@ class LogRow extends StatelessWidget {
                 // App Package Name
                 if (columns.showPackage) ...[
                   SizedBox(
-                    width: 140,
+                    width: compact ? 88 : 140,
                     child: Tooltip(
                       message: appPkg,
                       child: Text(
@@ -338,7 +342,7 @@ class LogRow extends StatelessWidget {
                 // Tag
                 if (columns.showTag) ...[
                   SizedBox(
-                    width: 140,
+                    width: compact ? 88 : 140,
                     child: Text(
                       entry.tag,
                       style: ls.tagStyle,

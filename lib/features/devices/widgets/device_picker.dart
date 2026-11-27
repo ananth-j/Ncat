@@ -10,11 +10,13 @@ class DevicePicker extends StatelessWidget {
     required this.devices,
     required this.pickedDevice,
     required this.onDeviceChanged,
+    this.expanded = false,
   });
 
   final List<DeviceInfo> devices;
   final String? pickedDevice;
   final ValueChanged<String?> onDeviceChanged;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +25,7 @@ class DevicePicker extends StatelessWidget {
         devices.any((d) => d.serial == pickedDevice) ? pickedDevice : null;
 
     return Container(
-      width: 215,
+      width: expanded ? double.infinity : 215,
       height: 32,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
@@ -35,6 +37,7 @@ class DevicePicker extends StatelessWidget {
         child: DropdownButton<String?>(
           value: value,
           isDense: true,
+          isExpanded: expanded,
           dropdownColor: palette.panel,
           icon: Icon(Icons.arrow_drop_down, size: 16, color: palette.dim),
           hint: Row(
