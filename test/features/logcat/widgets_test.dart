@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:thruwire/features/devices/device_controller.dart';
 import 'package:thruwire/features/devices/models/device_info.dart';
 import 'package:thruwire/features/logcat/models/log_entry.dart';
+import 'package:thruwire/features/logcat/models/log_tab_state.dart';
 import 'package:thruwire/features/logcat/models/noise_filter.dart';
 import 'package:thruwire/features/logcat/widgets/left_vertical_toolbar.dart';
 import 'package:thruwire/features/logcat/widgets/log_row.dart';
+import 'package:thruwire/features/logcat/widgets/log_tab_bar.dart';
 import 'package:thruwire/features/logcat/widgets/status_bar.dart';
 import 'package:thruwire/features/logcat/widgets/top_filter_bar.dart';
 import 'package:thruwire/src/column_config.dart';
@@ -280,6 +283,87 @@ void main() {
         await tester.tap(find.text('Filter by tag: "TestTag"'));
         await tester.pumpAndSettle();
         expect(filterTag, 'TestTag');
+      },
+    );
+  });
+
+  group('LogTabBar Widget Tests', () {
+    testWidgets(
+      'renders tabs for single device, supports add/select/close and context menu',
+      (tester) async {
+        setDesktopSize(tester);
+
+        String? selectedTab;
+        String? closedTab;
+        String? duplicatedTab;
+        bool added = false;
+
+        final tabs = [
+          LogTabState(
+            id: 'tab_1',
+            title: 'Logcat 1',
+            packageFilter: 'com.app.main',
+          ),
+          LogTabState(
+            id: 'tab_2',
+            title: 'Errors',
+            isCustomTitle: true,
+            minLevel: 'E',
+            paused: true,
+          ),
+        ];
+
+        await tester.pumpWidget(
+          wrapWithTheme(
+            LogTabBar(
+              tabs: tabs,
+              activeTabId: 'tab_1',
+              devices: const [
+                DeviceInfo(serial: 'DEV1', model: 'Pixel 8', authorized: true),
+              ],
+              activeDeviceSerial: 'DEV1',
+              viewMode: DeviceViewMode.singleOrTabs,
+              onSelectTab: (id) => selectedTab = id,
+              onAddTab: () => added = true,
+              onCloseTab: (id) => closedTab = id,
+              onDuplicateTab: (id) => duplicatedTab = id,
+              onRenameTab: (_, __) {},
+              onCloseOtherTabs: (_) {},
+              onCloseTabsToRight: (_) {},
+              onToggleViewMode: () {},
+            ),
+          ),
+        );
+
+        expect(find.text('com.app.main'), findsOneWidget);
+        expect(find.text('Errors'), findsOneWidget);
+        expect(find.text('E+'), findsOneWidget);
+
+        // Tap second tab to select
+        await tester.tap(find.text('Errors'));
+        await tester.pump();
+        expect(selectedTab, 'tab_2');
+
+        // Tap '+' button to add a tab
+        await tester.tap(find.byIcon(Icons.add));
+        await tester.pump();
+        expect(added, isTrue);
+
+        // Tap close icon on active tab
+        await tester.tap(find.byIcon(Icons.close).first);
+        await tester.pump();
+        expect(closedTab, 'tab_1');
+
+        // Secondary tap opens context menu with Duplicate Tab
+        await tester.tapAt(
+          tester.getCenter(find.text('com.app.main')),
+          buttons: 2,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Duplicate Tab'), findsOneWidget);
+        await tester.tap(find.text('Duplicate Tab'));
+        await tester.pumpAndSettle();
+        expect(duplicatedTab, 'tab_1');
       },
     );
   });

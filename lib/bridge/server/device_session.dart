@@ -14,6 +14,7 @@ class DeviceSession {
     required this.serial,
     required this.adbPath,
     this.processRunner = const RealProcessRunner(),
+    this.filterOnBridge = false,
     this.onStatusChange,
     this.onSystemMessage,
     this.onNewEntry,
@@ -34,6 +35,10 @@ class DeviceSession {
   final String serial;
   final String adbPath;
   final ProcessRunner processRunner;
+
+  /// When false (default), all device log lines are streamed and enriched with
+  /// resolved package names so multiple client tabs can filter independently.
+  final bool filterOnBridge;
 
   final void Function(String status)? onStatusChange;
   final void Function(String text)? onSystemMessage;
@@ -160,7 +165,9 @@ class DeviceSession {
     if (_isDisposed) return;
 
     _psTicks++;
-    if (_psTicks % 3 == 0 || (_packageFilter != null && _appPid == null)) {
+    if (_pidToProcess.isEmpty ||
+        _psTicks % 3 == 0 ||
+        (_packageFilter != null && _appPid == null)) {
       try {
         final r = await processRunner.run(adbPath, [
           '-s',
@@ -257,7 +264,7 @@ class DeviceSession {
     }
 
     final pid = int.parse(m.group(2)!);
-    if (_packageFilter != null && pid != _appPid) return;
+    if (filterOnBridge && _packageFilter != null && pid != _appPid) return;
 
     final entry = _createEntry(
       m.group(1)!,

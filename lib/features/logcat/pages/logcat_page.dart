@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../src/palette.dart';
-import '../../devices/widgets/device_tab_bar.dart';
 import '../../mirroring/capture_service.dart';
 import '../../mirroring/mirror_controller.dart';
 import '../../mirroring/widgets/multi_screen_grid.dart';
@@ -11,6 +10,7 @@ import '../../mirroring/widgets/screenshot_dialog.dart';
 import '../logcat_controller.dart';
 import '../widgets/column_config_dialog.dart';
 import '../widgets/left_vertical_toolbar.dart';
+import '../widgets/log_tab_bar.dart';
 import '../widgets/log_table_view.dart';
 import '../widgets/presets_dialog.dart';
 import '../widgets/status_bar.dart';
@@ -186,6 +186,28 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
         ): () => _mirrorController.toggleOpen(serial: _controller.activeDevice),
         const SingleActivator(LogicalKeyboardKey.keyL, control: true):
             _controller.clearLogs,
+        const SingleActivator(LogicalKeyboardKey.keyT, control: true):
+            _controller.addTab,
+        const SingleActivator(LogicalKeyboardKey.keyW, control: true):
+            () => _controller.closeTab(_controller.activeTabId),
+        const SingleActivator(LogicalKeyboardKey.tab, control: true):
+            _controller.selectNextTab,
+        const SingleActivator(
+              LogicalKeyboardKey.tab,
+              control: true,
+              shift: true,
+            ):
+            _controller.selectPreviousTab,
+        const SingleActivator(LogicalKeyboardKey.digit1, control: true):
+            () => _controller.selectTabByIndex(0),
+        const SingleActivator(LogicalKeyboardKey.digit2, control: true):
+            () => _controller.selectTabByIndex(1),
+        const SingleActivator(LogicalKeyboardKey.digit3, control: true):
+            () => _controller.selectTabByIndex(2),
+        const SingleActivator(LogicalKeyboardKey.digit4, control: true):
+            () => _controller.selectTabByIndex(3),
+        const SingleActivator(LogicalKeyboardKey.digit5, control: true):
+            () => _controller.selectTabByIndex(4),
       },
       child: Focus(
         autofocus: true,
@@ -216,15 +238,25 @@ class _LogcatPageState extends State<LogcatPage> with WidgetsBindingObserver {
                 },
               ),
 
-              // Per-device tabs bar (Phase 5.1) - rebuilds on device tab changes
+              // Multi-tab logcat bar (supports multiple tabs per device & across devices)
               ListenableBuilder(
                 listenable: _controller,
                 builder: (context, _) {
-                  return DeviceTabBar(
+                  return LogTabBar(
+                    tabs: _controller.logTabs,
+                    activeTabId: _controller.activeTabId,
                     devices: _controller.devices,
-                    activeSerial: _controller.activeDevice,
+                    activeDeviceSerial: _controller.activeDevice,
                     viewMode: _controller.viewMode,
-                    onSelectDevice: _controller.selectDeviceTab,
+                    onSelectTab: _controller.selectTab,
+                    onAddTab: _controller.addTab,
+                    onCloseTab: _controller.closeTab,
+                    onDuplicateTab: _controller.duplicateTab,
+                    onRenameTab: _controller.renameTab,
+                    onCloseOtherTabs: _controller.closeOtherTabs,
+                    onCloseTabsToRight: _controller.closeTabsToRight,
+                    onClearDeviceBuffer:
+                        () => _controller.clearLogs(clearDeviceBuffer: true),
                     onToggleViewMode: _controller.toggleViewMode,
                   );
                 },

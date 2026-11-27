@@ -395,11 +395,15 @@ class LogcatBridgeServer {
   }
 
   Future<void> _resolveActivePids() async {
-    final serial = _activeSerial();
-    if (serial == null) return;
-    final session = _sessions[serial];
-    if (session != null) {
-      await session.resolvePid();
+    final active = _activeSerial();
+    var updatedActive = false;
+    for (final entry in _sessions.entries) {
+      if (entry.value.status == 'connected') {
+        await entry.value.resolvePid();
+        if (entry.key == active) updatedActive = true;
+      }
+    }
+    if (updatedActive) {
       _broadcastStatus();
     }
   }

@@ -405,4 +405,187 @@ void main() {
       },
     );
   });
+
+  group('LogcatController multi-tab single-device support', () {
+    test('multiple tabs on a single device filter shared buffer independently', () {
+      controller.handleMessage(
+        const StatusMessage(
+          status: 'connected',
+          devices: [
+            DeviceInfo(serial: 'dev-1', model: 'Pixel 8', authorized: true),
+          ],
+          activeDevice: 'dev-1',
+        ),
+      );
+
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(1, 'D', 'AuthTag', 'Login start', pkg: 'com.app.one', pid: 101),
+          createEntry(2, 'E', 'PayTag', 'Payment failed', pkg: 'com.app.two', pid: 202),
+          createEntry(3, 'I', 'AuthTag', 'Login ok', pkg: 'com.app.one', pid: 101),
+        ], serial: 'dev-1'),
+      );
+
+      // Tab 1 filters com.app.one
+      controller.setFilterPackage('com.app.one');
+      expect(controller.visible.length, 2);
+      expect(controller.visible.every((e) => e.pkg == 'com.app.one'), isTrue);
+
+      // Open Tab 2 on the same device and filter errors / com.app.two
+      final tab1Id = controller.activeTabId;
+      final tab2Id = controller.addTab(deviceSerial: 'dev-1');
+      expect(controller.logTabs.length, 2);
+      expect(controller.activeTabId, tab2Id);
+      expect(controller.visible.length, 3);
+
+      controller.setMinLevel('E');
+      expect(controller.visible.length, 1);
+      expect(controller.visible.first.tag, 'PayTag');
+
+      // Switching back to Tab 1 restores its package filter & results
+      controller.selectTab(tab1Id);
+      expect(controller.pkgController.text, 'com.app.one');
+      expect(controller.minLevel, 'V');
+      expect(controller.visible.length, 2);
+    });
+
+    test('pausing one tab does not pause sibling live tab on same device', () {
+      controller.handleMessage(
+        const StatusMessage(
+          status: 'connected',
+          devices: [DeviceInfo(serial: 'dev-1', authorized: true)],
+          activeDevice: 'dev-1',
+        ),
+      );
+
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(1, 'I', 'App', 'Initial'),
+        ], serial: 'dev-1'),
+      );
+
+      final tab1Id = controller.activeTabId;
+      final tab2Id = controller.addTab(deviceSerial: 'dev-1');
+
+      // Pause Tab 1
+      controller.selectTab(tab1Id);
+      controller.togglePaused();
+      expect(controller.paused, isTrue);
+
+      // New batch arrives while Tab 1 is paused and Tab 2 is unpaused
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(2, 'I', 'App', 'Arrived while tab1 paused'),
+        ], serial: 'dev-1'),
+      );
+
+      // Tab 1 stays frozen at 1 line
+      expect(controller.visible.length, 1);
+
+      // Tab 2 sees both lines
+      controller.selectTab(tab2Id);
+      expect(controller.paused, isFalse);
+      expect(controller.visible.length, 2);
+
+      // Resuming Tab 1 catches up with the shared device buffer
+      controller.selectTab(tab1Id);
+      controller.togglePaused();
+      expect(controller.paused, isFalse);
+      expect(controller.visible.length, 2);
+    });
+
+    test('clearing one tab preserves sibling tab view on same device', () {
+      controller.handleMessage(
+        const StatusMessage(
+          status: 'connected',
+          devices: [DeviceInfo(serial: 'dev-1', authorized: true)],
+          activeDevice: 'dev-1',
+        ),
+      );
+
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(10, 'I', 'TagA', 'Line 1'),
+          createEntry(11, 'I', 'TagB', 'Line 2'),
+        ], serial: 'dev-1'),
+      );
+
+      final tab1Id = controller.activeTabId;
+      final tab2Id = controller.addTab(deviceSerial: 'dev-1');
+
+      // Clear Tab 2 view
+      controller.clearLogs();
+      expect(controller.visible, isEmpty);
+
+      // Incoming line after clear appears in Tab 2
+      controller.handleMessage(
+        LogBatchMessage([
+          createEntry(12, 'I', 'TagC', 'Line 3'),
+        ], serial: 'dev-1'),
+      );
+      expect(controller.visible.length, 1);
+      expect(controller.visible.first.seq, 12);
+
+      // Tab 1 still has all 3 lines
+      controller.selectTab(tab1Id);
+      expect(controller.visible.length, 3);
+      controller.selectTab(tab2Id);
+      expect(controller.visible.length, 1);
+    });
+
+    test('tab rename, duplicate, cycle, and close respect minimum 1 tab', () {
+      final tab1Id = controller.activeTabId;
+      controller.renameTab(tab1Id, 'Auth Logs');
+      expect(controller.activeTab.displayTitle, 'Auth Logs');
+
+      controller.setSearch('token');
+      final dupId = controller.duplicateTab(tab1Id);
+      expect(controller.logTabs.length, 2);
+      expect(controller.activeTabId, dupId);
+      expect(controller.search, 'token');
+
+      final tab3Id = controller.addTab();
+      expect(controller.logTabs.length, 3);
+
+      controller.selectNextTab();
+      expect(controller.activeTabId, tab1Id);
+      controller.selectPreviousTab();
+      expect(controller.activeTabId, tab3Id);
+
+      controller.closeOtherTabs(tab1Id);
+      expect(controller.logTabs.length, 1);
+      expect(controller.activeTabId, tab1Id);
+
+      // Attempting to close the sole remaining tab is a no-op
+      controller.closeTab(tab1Id);
+      expect(controller.logTabs.length, 1);
+    });
+
+    test('LogTabState JSON serialization round-trip preserves fields', () {
+      final state = LogTabState(
+        id: 'tab_7',
+        title: 'Network',
+        isCustomTitle: true,
+        deviceSerial: 'dev-xyz',
+        search: 'tag:OkHttp',
+        packageFilter: 'com.net.app',
+        minLevel: 'W',
+        useRegex: true,
+        noiseMode: NoiseFilterMode.showAll,
+        wrap: false,
+      );
+
+      final restored = LogTabState.fromJson(state.toJson());
+      expect(restored.id, 'tab_7');
+      expect(restored.title, 'Network');
+      expect(restored.isCustomTitle, isTrue);
+      expect(restored.deviceSerial, 'dev-xyz');
+      expect(restored.search, 'tag:OkHttp');
+      expect(restored.packageFilter, 'com.net.app');
+      expect(restored.minLevel, 'W');
+      expect(restored.useRegex, isTrue);
+      expect(restored.noiseMode, NoiseFilterMode.showAll);
+      expect(restored.wrap, isFalse);
+    });
+  });
 }

@@ -17,20 +17,22 @@ import '../devices/device_controller.dart';
 import '../devices/models/device_info.dart';
 import 'models/log_entry.dart';
 import 'models/log_query.dart';
+import 'models/log_tab_state.dart';
 import 'models/noise_filter.dart';
 
-// Re-export device and noise models for backward compatibility
+// Re-export device, tab, and noise models for backward compatibility
 export '../devices/device_controller.dart'
     show DeviceViewMode, DeviceTabState, DeviceController;
+export 'models/log_tab_state.dart' show LogTabState;
 export 'models/noise_filter.dart' show NoiseFilterMode, NoiseFilter;
 
-/// Central state controller for logcat streaming, filtering, presets, and export.
+/// Central state controller for logcat streaming, multi-tab filtering, presets, and export.
 class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   LogcatController({
     int maxLines = kMaxLines,
     DeviceController? deviceController,
-  })  : _maxLines = maxLines,
-        _deviceController = deviceController ?? DeviceController() {
+  }) : _maxLines = maxLines,
+       _deviceController = deviceController ?? DeviceController() {
     _deviceController.addListener(_onDeviceChanged);
   }
 
@@ -74,8 +76,17 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   String _connection = 'connecting';
   String _serverStatus = '';
   int? _appPid;
+  String? _lastStatusPackage;
 
-  DeviceTabState _getOrCreateTab(String serial) =>
+  // Multi-tab state (Android Studio Logcat-style)
+  final List<LogTabState> _tabs = [
+    LogTabState(id: 'tab_1', title: 'Logcat 1'),
+  ];
+  String _activeTabId = 'tab_1';
+  int _nextTabCounter = 2;
+  bool _userModifiedTabs = false;
+
+  DeviceTabState _getOrCreateDeviceBuffer(String serial) =>
       _deviceController.getOrCreateTab(serial);
 
   List<FilterPreset> _presets = const [];
@@ -105,10 +116,25 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   List<LogEntry> get visible => _visible;
   String get connection => _connection;
   String get serverStatus => _serverStatus;
-  int? get appPid => _appPid;
+
+  /// Effective PID for the active tab's package filter on its target device.
+  int? get appPid {
+    final pkg = pkgController.text.trim();
+    final serial = activeTabSerial;
+    if (pkg.isNotEmpty) {
+      if (serial != null) {
+        final cached = _deviceController.tabStates[serial]?.packagePids[pkg];
+        if (cached != null) return cached;
+      }
+      return _lastStatusPackage == pkg ? _appPid : null;
+    }
+    return _appPid;
+  }
+
   List<DeviceInfo> get devices => _deviceController.devices;
-  String? get activeDevice => _deviceController.activeDevice;
-  String? get pickedDevice => _deviceController.pickedDevice;
+  String? get activeDevice => activeTabSerial ?? _deviceController.activeDevice;
+  String? get pickedDevice =>
+      activeTab.deviceSerial ?? _deviceController.pickedDevice;
   DeviceViewMode get viewMode => _deviceController.viewMode;
   Map<String, DeviceTabState> get tabStates => _deviceController.tabStates;
   DeviceController get deviceController => _deviceController;
@@ -124,6 +150,21 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   int get hiddenNoiseCount => _hiddenNoiseCount;
   LogColumnConfig get columns => _columns;
 
+  // Multi-tab getters
+  List<LogTabState> get logTabs => List.unmodifiable(_tabs);
+  String get activeTabId => _activeTabId;
+  LogTabState get activeTab => _tabs.firstWhere(
+    (t) => t.id == _activeTabId,
+    orElse: () => _tabs.first,
+  );
+  int get activeTabIndex =>
+      _tabs.indexWhere((t) => t.id == activeTab.id).clamp(0, _tabs.length - 1);
+  String? get activeTabSerial =>
+      activeTab.deviceSerial ?? _deviceController.activeDevice;
+
+  String? _effectiveSerialFor(LogTabState tab) =>
+      tab.deviceSerial ?? _deviceController.activeDevice;
+
   void init() {
     WidgetsBinding.instance.addObserver(this);
     scrollController.addListener(_onScroll);
@@ -137,7 +178,37 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       _presets = p;
       notifyListeners();
     });
+    loadLogTabs().then((saved) {
+      if (!_userModifiedTabs && saved.tabs.isNotEmpty) {
+        _tabs
+          ..clear()
+          ..addAll(saved.tabs);
+        final targetId =
+            saved.activeTabId != null &&
+                    _tabs.any((t) => t.id == saved.activeTabId)
+                ? saved.activeTabId!
+                : _tabs.first.id;
+        _activeTabId = targetId;
+        _nextTabCounter = _computeNextTabCounter(_tabs);
+        _loadTabFields(activeTab);
+        _syncLinesFromActiveBuffer();
+        _recompute();
+      }
+    });
     _initBridgeAndConnect();
+  }
+
+  static int _computeNextTabCounter(List<LogTabState> tabs) {
+    var maxNum = tabs.length;
+    final re = RegExp(r'(\d+)$');
+    for (final t in tabs) {
+      final m = re.firstMatch(t.id) ?? re.firstMatch(t.title);
+      if (m != null) {
+        final n = int.tryParse(m.group(1)!);
+        if (n != null && n > maxNum) maxNum = n;
+      }
+    }
+    return maxNum + 1;
   }
 
   @override
@@ -160,10 +231,15 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     final atBottom = max <= 0 || current >= (max - 50);
     if (atBottom && !_autoScroll) {
       _autoScroll = true;
+      activeTab.autoScroll = true;
       notifyListeners();
     } else if (!atBottom && _autoScroll) {
       _autoScroll = false;
+      activeTab.autoScroll = false;
+      activeTab.scrollOffset = current;
       notifyListeners();
+    } else if (!_autoScroll) {
+      activeTab.scrollOffset = current;
     }
   }
 
@@ -172,20 +248,10 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   static const double _rowExtent = 23.0;
 
   /// Jumps the scroll position to the bottom of the list.
-  ///
-  /// When [wrap] is off the list uses a fixed [itemExtent], so we can
-  /// calculate the exact target offset from the item count without waiting
-  /// for a layout frame — eliminating the one-frame stutter caused by using
-  /// [maxScrollExtent] inside a [WidgetsBinding.addPostFrameCallback].
-  ///
-  /// When [wrap] is on row heights vary, so we fall back to [maxScrollExtent]
-  /// (still in a post-frame callback, but that case is rare while streaming).
   void scrollToBottom() {
     if (!_isAppActive || !scrollController.hasClients) return;
 
     if (!_wrap && _visible.isNotEmpty) {
-      // Fixed-height fast path: compute offset from item count directly.
-      // This fires synchronously in the same frame — no layout round-trip needed.
       final viewportHeight = scrollController.position.viewportDimension;
       final totalHeight = _visible.length * _rowExtent;
       final target = (totalHeight - viewportHeight).clamp(
@@ -194,7 +260,6 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
       );
       scrollController.jumpTo(target);
     } else {
-      // Variable-height fallback: wait for layout to know maxScrollExtent.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_autoScroll && scrollController.hasClients) {
           scrollController.jumpTo(scrollController.position.maxScrollExtent);
@@ -204,16 +269,16 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void scrollToEnd() {
-    // Jump first — before notifyListeners() triggers a rebuild.
-    // This way the scroll position is already at the bottom when Flutter
-    // lays out the new frame, so the user never sees the intermediate state.
     scrollToBottom();
     _autoScroll = true;
+    activeTab.autoScroll = true;
     notifyListeners();
   }
 
   void scrollToTop() {
     _autoScroll = false;
+    activeTab.autoScroll = false;
+    activeTab.scrollOffset = 0.0;
     notifyListeners();
     if (scrollController.hasClients) {
       scrollController.jumpTo(0);
@@ -280,42 +345,64 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   void handleMessage(BridgeMessage message) {
     switch (message) {
       case HistoryMessage(:final lines, :final serial):
-        final targetSerial = serial ?? activeDevice;
+        final targetSerial = serial ?? _deviceController.activeDevice;
         if (targetSerial != null) {
-          final tab = _getOrCreateTab(targetSerial);
-          tab.lines
+          final devBuf = _getOrCreateDeviceBuffer(targetSerial);
+          devBuf.lines
             ..clear()
             ..addAll(lines);
         }
-        if (targetSerial == null || targetSerial == activeDevice) {
-          _lines
-            ..clear()
-            ..addAll(lines);
-          _recompute();
-          if (_autoScroll) {
-            scrollToBottom();
+        final currentSerial = activeTabSerial;
+        if (targetSerial == null ||
+            currentSerial == null ||
+            targetSerial == currentSerial) {
+          if (!activeTab.paused) {
+            _lines
+              ..clear()
+              ..addAll(lines);
+            _recompute();
+            if (_autoScroll) {
+              scrollToBottom();
+            }
           }
         }
         break;
 
       case LogBatchMessage(:final lines, :final serial):
-        if (_paused) return;
-        final targetSerial = serial ?? activeDevice;
-        if (targetSerial != null) {
-          final tab = _getOrCreateTab(targetSerial);
-          tab.lines.addAll(lines);
-          final excess = tab.lines.length - _maxLines;
-          if (excess > 0) {
-            tab.lines.removeRange(0, excess);
+        final targetSerial = serial ?? _deviceController.activeDevice;
+        if (targetSerial == null) {
+          if (_paused) return;
+        } else {
+          // Only drop incoming lines if ALL tabs targeting this device are paused.
+          final matchingTabs =
+              _tabs
+                  .where((t) => _effectiveSerialFor(t) == targetSerial)
+                  .toList();
+          final hasUnpausedTab =
+              matchingTabs.isEmpty || matchingTabs.any((t) => !t.paused);
+          if (!hasUnpausedTab) return;
+
+          final devBuf = _getOrCreateDeviceBuffer(targetSerial);
+          devBuf.lines.addAll(lines);
+          final anyScrollPaused = matchingTabs.any((t) => !t.autoScroll);
+          final cap = anyScrollPaused ? _maxLines * 2 : _maxLines;
+          final devExcess = devBuf.lines.length - cap;
+          if (devExcess > 0) {
+            devBuf.lines.removeRange(0, devExcess);
           }
         }
 
-        // If batch is targeted to a background tab, buffer it without rebuilding UI
+        // If batch belongs to a background device, keep it buffered without rebuilding UI.
+        final currentSerial = activeTabSerial;
         if (targetSerial != null &&
-            activeDevice != null &&
-            targetSerial != activeDevice) {
+            currentSerial != null &&
+            targetSerial != currentSerial) {
           return;
         }
+
+        // If the active tab is paused while a sibling tab on the same device is live,
+        // leave the active tab's frozen snapshot untouched.
+        if (_paused) return;
 
         _lines.addAll(lines);
         final maxCapacity = _autoScroll ? _maxLines : _maxLines * 2;
@@ -332,23 +419,31 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
         // Phase 2.2: Incremental filtering - evaluate each newly arrived line once
         final currentPkg = pkgController.text.trim();
+        final currentAppPid = appPid;
         final isReduced = _noiseMode == NoiseFilterMode.reduce;
         final needsNoiseCheck =
             isReduced ||
             _noiseMode == NoiseFilterMode.onlyNoise ||
             _cachedQuery.hasNoiseTerm;
+        final clearedAfter = activeTab.clearedAfterSeq;
         final passing = <LogEntry>[];
 
         for (final l in lines) {
+          if (clearedAfter != null && l.seq <= clearedAfter) continue;
           final isNoise =
               needsNoiseCheck
                   ? NoiseFilter.isNoise(
                     l,
-                    appPid: _appPid,
+                    appPid: currentAppPid,
                     packageFilter: currentPkg,
                   )
                   : false;
-          if (_matchesEntry(l, currentPkg: currentPkg, isNoise: isNoise)) {
+          if (_matchesEntry(
+            l,
+            currentPkg: currentPkg,
+            tabAppPid: currentAppPid,
+            isNoise: isNoise,
+          )) {
             passing.add(l);
           } else if (isReduced && isNoise) {
             _hiddenNoiseCount++;
@@ -376,11 +471,23 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
         break;
 
       case ClearMessage(:final serial):
-        final targetSerial = serial ?? activeDevice;
+        final targetSerial = serial ?? _deviceController.activeDevice;
         if (targetSerial != null) {
           _deviceController.tabStates[targetSerial]?.lines.clear();
+          for (final t in _tabs) {
+            if (_effectiveSerialFor(t) == targetSerial) {
+              t.clearedAfterSeq = null;
+              t.pausedBufferSnapshot = null;
+            }
+          }
+        } else {
+          activeTab.clearedAfterSeq = null;
+          activeTab.pausedBufferSnapshot = null;
         }
-        if (targetSerial == null || targetSerial == activeDevice) {
+        final currentSerial = activeTabSerial;
+        if (targetSerial == null ||
+            currentSerial == null ||
+            targetSerial == currentSerial) {
           _lines.clear();
           _hiddenNoiseCount = 0;
           _recompute();
@@ -389,12 +496,19 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
       case StatusMessage(
         :final status,
+        :final package,
         :final pid,
         :final devices,
         :final activeDevice,
+        :final serial,
       ):
         _serverStatus = status;
         _appPid = pid;
+        _lastStatusPackage = package;
+        final pidSerial = serial ?? activeDevice ?? _deviceController.activeDevice;
+        if (pidSerial != null) {
+          _deviceController.setPackagePid(pidSerial, package, pid);
+        }
         _deviceController.updateDevices(
           devices,
           serverActiveDevice: activeDevice,
@@ -410,26 +524,26 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  void selectDeviceTab(String serial) {
-    if (activeDevice == serial) return;
+  // ---------------------------------------------------------------------------
+  // Multi-tab management (single or multiple devices)
+  // ---------------------------------------------------------------------------
 
-    // 1. Save current active tab filter state
-    final current = activeDevice;
-    if (current != null) {
-      final currentTab = _getOrCreateTab(current);
-      currentTab.search = _search;
-      currentTab.minLevel = _minLevel;
-      currentTab.packageFilter = pkgController.text.trim();
-      currentTab.useRegex = _useRegex;
-      currentTab.autoScroll = _autoScroll;
-      currentTab.paused = _paused;
-      currentTab.noiseMode = _noiseMode;
+  void _saveActiveTabFields() {
+    final tab = activeTab;
+    tab.search = _search;
+    tab.minLevel = _minLevel;
+    tab.packageFilter = pkgController.text.trim();
+    tab.useRegex = _useRegex;
+    tab.autoScroll = _autoScroll;
+    tab.paused = _paused;
+    tab.wrap = _wrap;
+    tab.noiseMode = _noiseMode;
+    if (scrollController.hasClients) {
+      tab.scrollOffset = scrollController.offset;
     }
+  }
 
-    // 2. Switch to target device tab
-    _deviceController.setActiveDevice(serial);
-    final tab = _getOrCreateTab(serial);
-
+  void _loadTabFields(LogTabState tab) {
     _search = tab.search;
     searchController.text = tab.search;
     pkgController.text = tab.packageFilter;
@@ -437,16 +551,273 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     _useRegex = tab.useRegex;
     _autoScroll = tab.autoScroll;
     _paused = tab.paused;
+    _wrap = tab.wrap;
     _noiseMode = tab.noiseMode;
-
     _updateFilterCache();
-    _lines
-      ..clear()
-      ..addAll(tab.lines);
+  }
 
+  void _syncLinesFromActiveBuffer() {
+    final tab = activeTab;
+    if (tab.paused && tab.pausedBufferSnapshot != null) {
+      _lines
+        ..clear()
+        ..addAll(tab.pausedBufferSnapshot!);
+      return;
+    }
+    final serial = activeTabSerial;
+    if (serial != null) {
+      final devBuf = _getOrCreateDeviceBuffer(serial);
+      _lines
+        ..clear()
+        ..addAll(devBuf.lines);
+    }
+  }
+
+  void _persistTabs() {
+    unawaited(saveLogTabs(_tabs, _activeTabId));
+  }
+
+  /// Adds a new log tab (optionally targeting [deviceSerial], applying a
+  /// [preset], or duplicating the active tab) and switches to it.
+  String addTab({
+    String? deviceSerial,
+    FilterPreset? preset,
+    bool duplicateCurrent = false,
+    String? title,
+  }) {
+    _saveActiveTabFields();
+    _userModifiedTabs = true;
+
+    final num = _nextTabCounter++;
+    final id = 'tab_$num';
+    final current = activeTab;
+
+    final LogTabState newTab;
+    if (duplicateCurrent) {
+      newTab = current.copyWith(
+        id: id,
+        title: title ?? '${current.displayTitle} ($num)',
+        isCustomTitle: title != null || current.isCustomTitle,
+        paused: false,
+      );
+    } else if (preset != null) {
+      newTab = LogTabState(
+        id: id,
+        title: title ?? preset.name,
+        isCustomTitle: true,
+        deviceSerial: deviceSerial ?? current.deviceSerial,
+        packageFilter: preset.package,
+        search: preset.search,
+        minLevel: preset.minLevel,
+        useRegex: preset.useRegex,
+      );
+    } else {
+      newTab = LogTabState(
+        id: id,
+        title: title ?? 'Logcat $num',
+        isCustomTitle: title != null,
+        deviceSerial: deviceSerial ?? current.deviceSerial,
+      );
+    }
+
+    _tabs.add(newTab);
+    selectTab(newTab.id);
+    return newTab.id;
+  }
+
+  /// Duplicates an existing tab and activates the copy.
+  String duplicateTab(String tabId) {
+    final idx = _tabs.indexWhere((t) => t.id == tabId);
+    if (idx < 0) return addTab(duplicateCurrent: true);
+    if (_activeTabId != tabId) {
+      selectTab(tabId);
+    }
+    return addTab(duplicateCurrent: true);
+  }
+
+  /// Switches the active viewport to [tabId], saving the previous tab's filters
+  /// and scroll state and recomputing against the target tab's device buffer.
+  void selectTab(String tabId) {
+    final targetIdx = _tabs.indexWhere((t) => t.id == tabId);
+    if (targetIdx < 0) return;
+    if (_activeTabId == tabId) return;
+
+    _userModifiedTabs = true;
+    _saveActiveTabFields();
+
+    final prevSerial = activeTabSerial;
+    _activeTabId = tabId;
+    final target = _tabs[targetIdx];
+    _loadTabFields(target);
+
+    final nextSerial = _effectiveSerialFor(target);
+    if (nextSerial != null && nextSerial != _deviceController.activeDevice) {
+      _deviceController.setActiveDevice(nextSerial);
+      sendCommand(DeviceCommand(nextSerial));
+    } else if (nextSerial != null && nextSerial != prevSerial) {
+      sendCommand(DeviceCommand(nextSerial));
+    }
+
+    if (target.packageFilter.isNotEmpty && nextSerial != null) {
+      final cachedPid =
+          _deviceController.tabStates[nextSerial]?.packagePids[target
+              .packageFilter];
+      if (cachedPid == null) {
+        sendCommand(FilterCommand(target.packageFilter, serial: nextSerial));
+      }
+    }
+
+    _syncLinesFromActiveBuffer();
     _recompute();
-    sendCommand(DeviceCommand(serial));
+
+    if (_autoScroll) {
+      scrollToBottom();
+    } else {
+      final offset = target.scrollOffset;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (scrollController.hasClients) {
+          final max = scrollController.position.maxScrollExtent;
+          scrollController.jumpTo(offset.clamp(0.0, max));
+        }
+      });
+    }
+
+    _persistTabs();
+  }
+
+  void selectNextTab() {
+    if (_tabs.length <= 1) return;
+    final nextIdx = (activeTabIndex + 1) % _tabs.length;
+    selectTab(_tabs[nextIdx].id);
+  }
+
+  void selectPreviousTab() {
+    if (_tabs.length <= 1) return;
+    final prevIdx = (activeTabIndex - 1 + _tabs.length) % _tabs.length;
+    selectTab(_tabs[prevIdx].id);
+  }
+
+  void selectTabByIndex(int index) {
+    if (index < 0 || index >= _tabs.length) return;
+    selectTab(_tabs[index].id);
+  }
+
+  /// Closes [tabId] while always keeping at least one open tab.
+  void closeTab(String tabId) {
+    if (_tabs.length <= 1) return;
+    final idx = _tabs.indexWhere((t) => t.id == tabId);
+    if (idx < 0) return;
+
+    _userModifiedTabs = true;
+    if (_activeTabId == tabId) {
+      final fallbackIdx = idx > 0 ? idx - 1 : 1;
+      selectTab(_tabs[fallbackIdx].id);
+    }
+    _tabs.removeWhere((t) => t.id == tabId);
+    _persistTabs();
     notifyListeners();
+  }
+
+  void closeOtherTabs(String tabId) {
+    if (!_tabs.any((t) => t.id == tabId) || _tabs.length <= 1) return;
+    _userModifiedTabs = true;
+    if (_activeTabId != tabId) {
+      selectTab(tabId);
+    }
+    _tabs.removeWhere((t) => t.id != tabId);
+    _persistTabs();
+    notifyListeners();
+  }
+
+  void closeTabsToRight(String tabId) {
+    final idx = _tabs.indexWhere((t) => t.id == tabId);
+    if (idx < 0 || idx >= _tabs.length - 1) return;
+    _userModifiedTabs = true;
+    final activeIdx = activeTabIndex;
+    if (activeIdx > idx) {
+      selectTab(tabId);
+    }
+    _tabs.removeRange(idx + 1, _tabs.length);
+    _persistTabs();
+    notifyListeners();
+  }
+
+  void renameTab(String tabId, String title) {
+    final idx = _tabs.indexWhere((t) => t.id == tabId);
+    if (idx < 0) return;
+    final trimmed = title.trim();
+    if (trimmed.isEmpty) {
+      _tabs[idx].isCustomTitle = false;
+      _tabs[idx].title = 'Logcat ${idx + 1}';
+    } else {
+      _tabs[idx].isCustomTitle = true;
+      _tabs[idx].title = trimmed;
+    }
+    _userModifiedTabs = true;
+    _persistTabs();
+    notifyListeners();
+  }
+
+  /// Changes the target device serial for the currently active tab without
+  /// altering other tabs' target devices.
+  void setTabDevice(String? serial) {
+    _userModifiedTabs = true;
+    final normalized = (serial == null || serial.isEmpty) ? null : serial;
+    final current = activeTab;
+    current.deviceSerial = normalized;
+    current.clearedAfterSeq = null;
+    current.pausedBufferSnapshot = null;
+
+    _deviceController.applyDevice(normalized);
+    final effective = activeTabSerial;
+    if (effective != null) {
+      sendCommand(DeviceCommand(effective));
+    } else {
+      sendCommand(const DeviceCommand(null));
+    }
+
+    _syncLinesFromActiveBuffer();
+    _recompute();
+    _persistTabs();
+  }
+
+  /// Switches to a tab showing [serial] (creating one if none exists yet),
+  /// preserving backward compatibility with device-level navigation.
+  void selectDeviceTab(String serial) {
+    final currentEffective = activeTabSerial;
+    if (currentEffective == serial && activeTab.deviceSerial == serial) return;
+
+    // Pin the current tab to its active serial before switching away so its
+    // filter state stays bound to that device.
+    if (activeTab.deviceSerial == null && currentEffective != null) {
+      activeTab.deviceSerial = currentEffective;
+    }
+
+    if (currentEffective == serial) {
+      _deviceController.setActiveDevice(serial);
+      notifyListeners();
+      return;
+    }
+
+    final existingIdx = _tabs.indexWhere((t) => t.deviceSerial == serial);
+    if (existingIdx >= 0) {
+      selectTab(_tabs[existingIdx].id);
+      return;
+    }
+
+    // If the sole tab has no device pinned and no logs/filters yet, reuse it;
+    // otherwise open a dedicated tab for the target device.
+    final isFreshSingleTab =
+        _tabs.length == 1 &&
+        activeTab.deviceSerial == null &&
+        _lines.isEmpty &&
+        _search.isEmpty &&
+        pkgController.text.trim().isEmpty;
+    if (isFreshSingleTab) {
+      setTabDevice(serial);
+    } else {
+      addTab(deviceSerial: serial);
+    }
   }
 
   void setViewMode(DeviceViewMode mode) {
@@ -495,9 +866,18 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   bool _matchesEntry(
     LogEntry e, {
     required String currentPkg,
+    required int? tabAppPid,
     required bool isNoise,
   }) {
     if (e.rank < _cachedMinRank) return false;
+
+    if (currentPkg.isNotEmpty) {
+      final lowerPkg = currentPkg.toLowerCase();
+      final entryPkg = e.pkg?.toLowerCase();
+      final matchesPkg = entryPkg != null && entryPkg.contains(lowerPkg);
+      final matchesPid = tabAppPid != null && e.pid == tabAppPid;
+      if (!matchesPkg && !matchesPid) return false;
+    }
 
     if (!_cachedQuery.hasNoiseTerm) {
       if (_noiseMode == NoiseFilterMode.reduce && isNoise) {
@@ -513,10 +893,10 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
         'tag' => term.matches(e.tag),
         'message' => term.matches(e.msg),
         'package' => term.matches(
-          e.pkg ?? (_appPid == e.pid ? currentPkg : ''),
+          e.pkg ?? (tabAppPid == e.pid ? currentPkg : ''),
         ),
         'process' => term.matches(
-          e.pkg ?? (_appPid == e.pid ? currentPkg : '${e.pid}'),
+          e.pkg ?? (tabAppPid == e.pid ? currentPkg : '${e.pid}'),
         ),
         'level' => _matchesLevelTerm(e, term.value, term.negated),
         'is' => term.matches(isNoise ? 'noise' : 'clean'),
@@ -551,17 +931,25 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
         _noiseMode == NoiseFilterMode.onlyNoise ||
         _cachedQuery.hasNoiseTerm;
     final currentPkg = pkgController.text.trim();
+    final currentAppPid = appPid;
+    final clearedAfter = activeTab.clearedAfterSeq;
 
     for (final e in _lines) {
+      if (clearedAfter != null && e.seq <= clearedAfter) continue;
       final isNoise =
           needsNoiseCheck
               ? NoiseFilter.isNoise(
                 e,
-                appPid: _appPid,
+                appPid: currentAppPid,
                 packageFilter: currentPkg,
               )
               : false;
-      if (_matchesEntry(e, currentPkg: currentPkg, isNoise: isNoise)) {
+      if (_matchesEntry(
+        e,
+        currentPkg: currentPkg,
+        tabAppPid: currentAppPid,
+        isNoise: isNoise,
+      )) {
         _visible.add(e);
       } else if (isReduced && isNoise) {
         hidden++;
@@ -576,7 +964,9 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   void setNoiseMode(NoiseFilterMode mode) {
     if (_noiseMode == mode) return;
     _noiseMode = mode;
+    activeTab.noiseMode = mode;
     _recompute();
+    _persistTabs();
   }
 
   void toggleReduceNoise() {
@@ -589,38 +979,63 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
 
   void setSearch(String v, {bool immediate = true}) {
     _search = v;
+    activeTab.search = v;
     if (immediate) {
       _searchDebounce?.cancel();
       _recompute();
+      _persistTabs();
     } else {
       _searchDebounce?.cancel();
-      _searchDebounce = Timer(const Duration(milliseconds: 150), _recompute);
+      _searchDebounce = Timer(const Duration(milliseconds: 150), () {
+        _recompute();
+        _persistTabs();
+      });
     }
   }
 
   void setMinLevel(String v) {
     _minLevel = v;
+    activeTab.minLevel = v;
     _recompute();
+    _persistTabs();
   }
 
   void toggleRegex() {
     _useRegex = !_useRegex;
+    activeTab.useRegex = _useRegex;
     _recompute();
+    _persistTabs();
   }
 
   void togglePaused() {
     _paused = !_paused;
+    activeTab.paused = _paused;
+    if (_paused) {
+      activeTab.pausedBufferSnapshot = List<LogEntry>.of(_lines);
+    } else {
+      activeTab.pausedBufferSnapshot = null;
+      _syncLinesFromActiveBuffer();
+      _recompute();
+      return;
+    }
     notifyListeners();
   }
 
   void toggleWrap() {
     _wrap = !_wrap;
+    activeTab.wrap = _wrap;
     notifyListeners();
+    _persistTabs();
   }
 
   void applyPackage() {
     final pkg = pkgController.text.trim();
-    sendCommand(FilterCommand(pkg.isEmpty ? null : pkg));
+    activeTab.packageFilter = pkg;
+    sendCommand(
+      FilterCommand(pkg.isEmpty ? null : pkg, serial: activeTabSerial),
+    );
+    _recompute();
+    _persistTabs();
   }
 
   void setFilterPackage(String pkg) {
@@ -631,20 +1046,34 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
   void setFilterTag(String tag) {
     searchController.text = tag;
     _search = tag;
+    activeTab.search = tag;
+    _recompute();
+    _persistTabs();
+  }
+
+  /// Clears logs for the active tab view by default. Pass [clearDeviceBuffer]
+  /// as `true` to also run `adb logcat -c` on the bridge for the active device.
+  void clearLogs({bool clearDeviceBuffer = false}) {
+    if (clearDeviceBuffer) {
+      sendCommand(ClearCommand(serial: activeTabSerial));
+      return;
+    }
+    if (_lines.isNotEmpty) {
+      activeTab.clearedAfterSeq = _lines.last.seq;
+    }
+    if (activeTab.paused) {
+      activeTab.pausedBufferSnapshot = [];
+      _lines.clear();
+    }
     _recompute();
   }
 
-  void clearLogs() {
-    sendCommand(const ClearCommand());
-  }
-
   void restartAdb() {
-    sendCommand(const RestartCommand());
+    sendCommand(RestartCommand(serial: activeTabSerial));
   }
 
   void applyDevice(String? serial) {
-    _deviceController.applyDevice(serial);
-    sendCommand(DeviceCommand(serial));
+    setTabDevice(serial);
   }
 
   void updateColumns(LogColumnConfig next) {
@@ -680,17 +1109,22 @@ class LogcatController extends ChangeNotifier with WidgetsBindingObserver {
     _minLevel = preset.minLevel;
     _useRegex = preset.useRegex;
     _search = preset.search;
-    _recompute();
+    activeTab.packageFilter = preset.package;
+    activeTab.search = preset.search;
+    activeTab.minLevel = preset.minLevel;
+    activeTab.useRegex = preset.useRegex;
     applyPackage();
   }
 
   String _formatEntry(LogEntry e, String currentPkg) {
     final parts = <String>[];
+    final currentAppPid = appPid;
     if (_columns.showTime) parts.add(e.time);
     if (_columns.showPidTid) parts.add('${e.pid}-${e.tid}');
     if (_columns.showPackage) {
       final pkg =
-          e.pkg ?? (_appPid != null && e.pid == _appPid ? currentPkg : null);
+          e.pkg ??
+          (currentAppPid != null && e.pid == currentAppPid ? currentPkg : null);
       if (pkg != null && pkg.isNotEmpty) parts.add(pkg);
     }
     if (_columns.showLevel && _columns.showTag) {

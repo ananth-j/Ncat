@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thruwire/bridge/server/device_session.dart';
@@ -130,5 +131,54 @@ void main() {
         reason: 'Must clean up temporary recording files',
       );
     });
+
+    test(
+      'streams all packages with resolved pkg metadata even when package filter is set',
+      () async {
+        final session = DeviceSession(
+          serial: 'device-multitab',
+          adbPath: 'adb',
+          processRunner: fakeRunner,
+        );
+
+        final stdout = StreamController<List<int>>();
+        fakeRunner.onStart('logcat', (args) async {
+          return FakeProcess(stdoutStream: stdout.stream);
+        });
+        fakeRunner.onRun('ps', (args) async {
+          return ProcessResult(
+            1234,
+            0,
+            'u0_a100 101 1 0 0 0 0 S com.app.one\n'
+            'u0_a101 202 1 0 0 0 0 S com.app.two\n',
+            '',
+          );
+        });
+        fakeRunner.onRun('pidof', (args) async {
+          return ProcessResult(1234, 0, '101\n', '');
+        });
+
+        await session.startLogcat();
+        session.setPackageFilter('com.app.one');
+        await session.resolvePid();
+        expect(session.appPid, 101);
+
+        stdout.add(
+          utf8.encode(
+            '10-18 10:00:00.000 101 101 I TagOne: From app one\n'
+            '10-18 10:00:01.000 202 202 I TagTwo: From app two\n',
+          ),
+        );
+        await pumpEventQueue();
+
+        final batch = session.flushPending();
+        final appLogs = batch.where((e) => e['tag'] != 'bridge').toList();
+        expect(appLogs.length, 2);
+        expect(appLogs[0]['pkg'], 'com.app.one');
+        expect(appLogs[1]['pkg'], 'com.app.two');
+
+        await session.dispose();
+      },
+    );
   });
 }

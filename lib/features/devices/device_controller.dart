@@ -7,7 +7,7 @@ import 'models/device_info.dart';
 /// View display modes for multi-device workflows.
 enum DeviceViewMode { singleOrTabs, grid }
 
-/// Isolated log buffer and filter state for a single connected device.
+/// Isolated log buffer and device-scoped state for a single connected device.
 class DeviceTabState {
   DeviceTabState({required this.serial});
 
@@ -22,6 +22,9 @@ class DeviceTabState {
   bool paused = false;
   NoiseFilterMode noiseMode = NoiseFilterMode.reduce;
   int? appPid;
+
+  /// Cached PIDs resolved on the bridge for package names on this device.
+  final Map<String, int?> packagePids = {};
 }
 
 /// Manages device discovery, active serial selection, tab states, and matrix/grid view modes.
@@ -85,6 +88,15 @@ class DeviceController extends ChangeNotifier {
         ? DeviceViewMode.grid
         : DeviceViewMode.singleOrTabs;
     notifyListeners();
+  }
+
+  /// Records a resolved PID for a package on [serial].
+  void setPackagePid(String serial, String? packageName, int? pid) {
+    final tab = getOrCreateTab(serial);
+    if (packageName != null && packageName.isNotEmpty) {
+      tab.packagePids[packageName] = pid;
+    }
+    tab.appPid = pid;
   }
 
   /// Applies device selection from dropdown or UI picker.
